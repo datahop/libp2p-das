@@ -3,20 +3,20 @@ package main
 import "context"
 
 const (
-	EchoService         = "EchoRPCAPI"
-	EchoServiceFuncEcho = "Echo"
+    EchoService         = "EchoRPCAPI"
+    EchoServiceFuncEcho = "Echo"
 )
 
 type EchoRPCAPI struct {
-	service *Service
+    service *Service
 }
 
 type Envelope struct {
-	Samples []byte
-	Message string
+    Samples []byte
+    Message string
 }
 
 func (r *EchoRPCAPI) Echo(ctx context.Context, in Envelope, out *Envelope) error {
-	*out = r.service.ReceiveEcho(in)
-	return nil
+    *out = r.service.ReceiveEcho(in)
+    return nil
 }

@@ -1,60 +1,60 @@
 package main
 
 import (
-	"context"
-	"fmt"
-	"log"
-	"time"
+    "context"
+    "fmt"
+    "log"
+    "time"
 
-	"github.com/libp2p/go-libp2p-core/host"
-	"github.com/libp2p/go-libp2p-core/network"
-	discovery "github.com/libp2p/go-libp2p-discovery"
-	dht "github.com/libp2p/go-libp2p-kad-dht"
+    "github.com/libp2p/go-libp2p-core/host"
+    "github.com/libp2p/go-libp2p-core/network"
+    discovery "github.com/libp2p/go-libp2p-discovery"
+    dht "github.com/libp2p/go-libp2p-kad-dht"
 )
 
 func Discover(ctx context.Context, h host.Host, dht *dht.IpfsDHT, rendezvous string) {
-	var routingDiscovery = discovery.NewRoutingDiscovery(dht)
+    var routingDiscovery = discovery.NewRoutingDiscovery(dht)
 
-	discovery.Advertise(ctx, routingDiscovery, rendezvous)
+    discovery.Advertise(ctx, routingDiscovery, rendezvous)
 
-	ticker := time.NewTicker(time.Second * 1)
-	defer ticker.Stop()
+    ticker := time.NewTicker(time.Second * 1)
+    defer ticker.Stop()
 
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		case <-ticker.C:
+    for {
+        select {
+        case <-ctx.Done():
+            return
+        case <-ticker.C:
 
-			peers, err := discovery.FindPeers(ctx, routingDiscovery, rendezvous)
-			if err != nil {
+            peers, err := discovery.FindPeers(ctx, routingDiscovery, rendezvous)
+            if err != nil {
                 log.Printf("FindPeers failed\n")
-				log.Fatal(err)
-			}
+                log.Fatal(err)
+            }
 
-			if len(peers) > 1 {
-				log.Printf("Found %d peers.\n", len(peers))
-			}
+            if len(peers) > 1 {
+                log.Printf("Found %d peers.\n", len(peers))
+            }
 
-			for _, p := range peers {
-				if p.ID == h.ID() {
-					continue
-				}
+            for _, p := range peers {
+                if p.ID == h.ID() {
+                    continue
+                }
 
-				// fmt.Printf("- %s\n", p.ID[0:5].Pretty())
+                // fmt.Printf("- %s\n", p.ID[0:5].Pretty())
 
-				if h.Network().Connectedness(p.ID) != network.Connected {
-					_, err = h.Network().DialPeer(ctx, p.ID)
-					// fmt.Printf("Connected to peer %s\n", p.ID.Pretty())
-					if err != nil {
-						continue
-					}
-				}
-			}
+                if h.Network().Connectedness(p.ID) != network.Connected {
+                    _, err = h.Network().DialPeer(ctx, p.ID)
+                    // fmt.Printf("Connected to peer %s\n", p.ID.Pretty())
+                    if err != nil {
+                        continue
+                    }
+                }
+            }
 
-			if len(peers) > 1 {
-				fmt.Println()
-			}
-		}
-	}
+            if len(peers) > 1 {
+                fmt.Println()
+            }
+        }
+    }
 }
