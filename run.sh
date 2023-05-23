@@ -5,3 +5,6 @@ if [[ $1 == "bootstrap" ]]; then
 else
     go run . -peer /ip4/10.210.118.52/tcp/61960/p2p/12D3KooWE3AwZFT9zEWDUxhya62hmvEbRxYBWaosn7Kiqw5wsu73 -duration $1 &
 fi
+
+# Wait for the code to finish and exit
+wait $!

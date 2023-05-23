@@ -25,5 +25,4 @@ do
     fi
 done
 
-# wait
-sleep 15
+wait $!
