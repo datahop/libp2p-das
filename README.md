@@ -22,3 +22,10 @@ Running 3 peers.
 ```shell
 ./test.sh 3
 ```
+
+# Logging
+What do I log?
+- # of put message
+- # of get messages
+    - # of successful gets
+    - # of failed gets

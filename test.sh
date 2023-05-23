@@ -26,4 +26,4 @@ do
 done
 
 # wait
-sleep 30
+sleep 20

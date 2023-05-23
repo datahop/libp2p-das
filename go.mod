@@ -3,6 +3,7 @@ module github.com/ldej/telephone
 go 1.15
 
 require (
+	github.com/fatih/color v1.15.0
 	github.com/libp2p/go-libp2p v0.13.0
 	github.com/libp2p/go-libp2p-core v0.8.0
 	github.com/libp2p/go-libp2p-discovery v0.5.0
