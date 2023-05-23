@@ -24,6 +24,7 @@ type Config struct {
 	Seed           int64
 	DiscoveryPeers addrList
 	Debug          bool
+	Duration       int
 }
 
 type Stats struct {
@@ -66,6 +67,7 @@ func main() {
 	flag.Var(&config.DiscoveryPeers, "peer", "Peer multiaddress for peer discovery")
 	flag.StringVar(&config.ProtocolID, "protocolid", "/p2p/rpc", "")
 	flag.IntVar(&config.Port, "port", 0, "")
+	flag.IntVar(&config.Duration, "duration", 15, "How long to run the test for (in seconds).")
 	flag.BoolVar(&debugMode, "debug", false, "Enable debug mode - see more messages about what is happening.")
 	flag.Parse()
 
@@ -111,8 +113,8 @@ func main() {
 		log.Fatal(err)
 	}
 
-	// Create a timer that runs for 15 seconds
-	timer := time.NewTimer(15 * time.Second)
+	// Create a timer that runs for x seconds
+	timer := time.NewTimer(time.Duration(config.Duration) * time.Second)
 
 	// Start the messaging service in a separate goroutine
 	go func() {

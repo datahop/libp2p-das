@@ -65,7 +65,7 @@ func (s *Service) StartMessaging(dht *dht.IpfsDHT, stats *Stats, ctx context.Con
 				putErr := dht.PutValue(ctx, "/das/sample/"+s.host.ID().Pretty(), sample)
 				if putErr != nil {
 					stats.PutLatencies = append(stats.PutLatencies, time.Since(startTime))
-					log.Print("[" + s.host.ID()[0:5].Pretty() + "]" + putErr.Error())
+					log.Print("[" + s.host.ID()[0:5].Pretty() + "] PutValue() Error: " + putErr.Error())
 				}
 				log.Print("[" + s.host.ID()[0:5].Pretty() + "] " + colorize("PUT", "green") + " 42KB sample into DHT.\n")
 				stats.TotalPutMessages += 1
@@ -80,7 +80,7 @@ func (s *Service) StartMessaging(dht *dht.IpfsDHT, stats *Stats, ctx context.Con
 				// ? Get sample from DHT
 				_, err := dht.GetValue(ctx, "/das/sample/"+randomPeer.Pretty())
 				if err != nil {
-					log.Print("[" + s.host.ID()[0:5].Pretty() + "]" + err.Error())
+					log.Print("[" + s.host.ID()[0:5].Pretty() + "] GetValue() Error: " + err.Error())
 					stats.GetLatencies = append(stats.GetLatencies, time.Since(startTime))
 					stats.TotalFailedGets += 1
 					stats.TotalGetMessages += 1

@@ -1,15 +1,15 @@
 # How to run
 ## Normal
 ```shell
-./run.sh <is_bootstrap>
+./run.sh <is_bootstrap> <execution_duration_in_secs>
 ```
 
 Example:
-Running 3 peers with 1 being the bootstrap node.
+Running 3 peers with 1 being the bootstrap node for 20 seconds.
 ```shell
-./run.sh bootstrap
-./run.sh
-./run.sh
+./run.sh bootstrap 20
+./run.sh 20
+./run.sh 20
 ```
 
 ## Testing
@@ -29,3 +29,4 @@ What do I log?
 - # of get messages
     - # of successful gets
     - # of failed gets
+- latencies per message
