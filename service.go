@@ -12,6 +12,7 @@ import (
 	"github.com/libp2p/go-libp2p-core/protocol"
 	rpc "github.com/libp2p/go-libp2p-gorpc"
 	dht "github.com/libp2p/go-libp2p-kad-dht"
+	// dht "./vendor/go-libp2p-kad-dht"
 )
 
 type Service struct {
@@ -78,17 +79,19 @@ func (s *Service) StartMessaging(dht *dht.IpfsDHT, stats *Stats, ctx context.Con
 				randomPeer := peers[randIndex]
 				startTime := time.Now()
 				// ? Get sample from DHT
-				_, err := dht.GetValue(ctx, "/das/sample/"+randomPeer.Pretty())
+				_, hops, err := dht.GetValueHops(ctx, "/das/sample/"+randomPeer.Pretty())
 				if err != nil {
 					log.Print("[" + s.host.ID()[0:5].Pretty() + "] GetValue() Error: " + err.Error())
 					stats.GetLatencies = append(stats.GetLatencies, time.Since(startTime))
 					stats.TotalFailedGets += 1
 					stats.TotalGetMessages += 1
+					stats.GetHops = append(stats.GetHops, hops)
 				} else {
 					log.Print("[" + s.host.ID()[0:5].Pretty() + "] " + colorize("GOT", "blue") + " 42KB sample for " + randomPeer[0:5].Pretty() + " from DHT.\n")
 					stats.TotalSuccessGets += 1
 					stats.TotalGetMessages += 1
 					stats.GetLatencies = append(stats.GetLatencies, time.Since(startTime))
+					stats.GetHops = append(stats.GetHops, hops)
 				}
 			}
 

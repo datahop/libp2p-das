@@ -36,6 +36,8 @@ type Stats struct {
 	PutLatencies []time.Duration
 	// Array of latencies for gets
 	GetLatencies []time.Duration
+	// Array of hops for gets
+	GetHops []int
 }
 
 func colorize(word string, colorName string) string {
@@ -172,9 +174,9 @@ func writeTotalStatsToFile(stats *Stats, h host.Host) error {
 }
 
 func writeLatencyStatsToFile(stats *Stats, h host.Host) error {
-	// Convert latencies to rows
+	// Convert latencies and hops to rows
 	var latencyRows [][]string
-	for i := 0; i < len(stats.PutLatencies) || i < len(stats.GetLatencies); i++ {
+	for i := 0; i < len(stats.PutLatencies) || i < len(stats.GetLatencies) || i < len(stats.GetHops); i++ {
 		var row []string
 		if i < len(stats.PutLatencies) {
 			row = append(row, strconv.FormatInt(stats.PutLatencies[i].Microseconds(), 10))
@@ -183,6 +185,11 @@ func writeLatencyStatsToFile(stats *Stats, h host.Host) error {
 		}
 		if i < len(stats.GetLatencies) {
 			row = append(row, strconv.FormatInt(stats.GetLatencies[i].Microseconds(), 10))
+		} else {
+			row = append(row, "")
+		}
+		if i < len(stats.GetHops) {
+			row = append(row, strconv.Itoa(stats.GetHops[i]))
 		} else {
 			row = append(row, "")
 		}
@@ -199,7 +206,7 @@ func writeLatencyStatsToFile(stats *Stats, h host.Host) error {
 	w := csv.NewWriter(f)
 	defer w.Flush()
 
-	headers := []string{"GET latencies (us)", "PUT latencies (us)"}
+	headers := []string{"PUT latencies (us)", "GET latencies (us)", "GET hops"}
 	rows := latencyRows
 
 	// Write headers and rows to CSV file
