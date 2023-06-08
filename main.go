@@ -96,10 +96,10 @@ func main() {
 	//  log.Printf("Created new host:\n\tID: [%s] \n\tSeed: [%d] \n\tPort: [%d]", h.ID().Pretty(), config.Seed, config.Port)
 	// }
 
-	// log.Printf("Connect to me on:")
-	// for _, addr := range h.Addrs() {
-	//  log.Printf("  %s/p2p/%s", addr, h.ID().Pretty())
-	// }
+	log.Printf("Connect to me on:")
+	for _, addr := range h.Addrs() {
+		log.Printf("  %s/p2p/%s", addr, h.ID().Pretty())
+	}
 
 	dht, err := NewDHT(ctx, h, config.DiscoveryPeers)
 	if err != nil {

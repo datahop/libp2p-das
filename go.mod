@@ -3,12 +3,12 @@ module github.com/libp2p-das
 go 1.17
 
 require (
+	github.com/Blitz3r123/go-libp2p-kad-dht v0.0.0-20230608150018-7269b838f58e
 	github.com/fatih/color v1.15.0
 	github.com/libp2p/go-libp2p v0.13.0
 	github.com/libp2p/go-libp2p-core v0.8.0
 	github.com/libp2p/go-libp2p-discovery v0.5.0
 	github.com/libp2p/go-libp2p-gorpc v0.1.2
-	github.com/libp2p/go-libp2p-kad-dht v0.11.1
 	github.com/multiformats/go-multiaddr v0.3.1
 )
 
@@ -44,6 +44,7 @@ require (
 	github.com/libp2p/go-libp2p-autonat v0.4.0 // indirect
 	github.com/libp2p/go-libp2p-blankhost v0.2.0 // indirect
 	github.com/libp2p/go-libp2p-circuit v0.4.0 // indirect
+	github.com/libp2p/go-libp2p-kad-dht v0.11.1 // indirect
 	github.com/libp2p/go-libp2p-kbucket v0.4.7 // indirect
 	github.com/libp2p/go-libp2p-loggables v0.1.0 // indirect
 	github.com/libp2p/go-libp2p-mplex v0.4.1 // indirect

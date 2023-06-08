@@ -7,11 +7,11 @@ import (
 	"math/rand"
 	"time"
 
+	dht "github.com/Blitz3r123/go-libp2p-kad-dht"
 	"github.com/libp2p/go-libp2p-core/host"
 	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/libp2p/go-libp2p-core/protocol"
 	rpc "github.com/libp2p/go-libp2p-gorpc"
-	dht "github.com/libp2p/go-libp2p-kad-dht"
 	// dht "./vendor/go-libp2p-kad-dht"
 )
 
