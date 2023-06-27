@@ -43,7 +43,7 @@ func (s *Service) SetupRPC() error {
 	return nil
 }
 
-func (s *Service) StartMessaging(dht *dht.IpfsDHT, stats *Stats, ctx context.Context) {
+func (s *Service) StartMessaging(dht *dht.IpfsDHT, stats *Stats, isValidator bool, ctx context.Context) {
 	ticker := time.NewTicker(time.Second * 1)
 	defer ticker.Stop()
 
@@ -55,12 +55,7 @@ func (s *Service) StartMessaging(dht *dht.IpfsDHT, stats *Stats, ctx context.Con
 			var sample []byte = make([]byte, 42000)
 			peers := FilterSelf(s.host.Peerstore().Peers(), s.host.ID())
 
-			// log.Printf("[%s] %d peers in peerstore\n", s.host.ID()[0:5].Pretty(), len(peers))
-			// for _, p := range peers {
-			// 	log.Printf("\t%s\n", p[0:5].Pretty())
-			// }
-
-			if len(peers) > 0 {
+			if len(peers) > 0 && isValidator {
 				startTime := time.Now()
 				// ? Put sample into DHT
 				putErr := dht.PutValue(ctx, "/das/sample/"+s.host.ID().Pretty(), sample)

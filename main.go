@@ -84,17 +84,14 @@ func main() {
 
 	ctx, cancel := context.WithCancel(context.Background())
 
-	h, err := NewHost(ctx, config.Seed, config.Port)
+	h, isValidator, err := NewHost(ctx, config.Seed, config.Port)
+
 	if err != nil {
 		fmt.Printf("NewHost() failed\n")
 		log.Fatal(err)
 	}
 
 	log.Print(colorize("Created Host ID: "+h.ID()[0:7].Pretty()+"\n", "white"))
-
-	// if debugMode {
-	//  log.Printf("Created new host:\n\tID: [%s] \n\tSeed: [%d] \n\tPort: [%d]", h.ID().Pretty(), config.Seed, config.Port)
-	// }
 
 	log.Printf("Connect to me on:")
 	for _, addr := range h.Addrs() {
@@ -120,22 +117,24 @@ func main() {
 
 	// Start the messaging service in a separate goroutine
 	go func() {
-		service.StartMessaging(dht, stats, ctx)
+		service.StartMessaging(dht, stats, isValidator, ctx)
 	}()
 
 	// Wait for the timer to expire
 	<-timer.C
 	log.Printf("Timer expired, shutting down...\n")
 
-	if err := writeTotalStatsToFile(stats, h); err != nil {
+	if filename, err := writeTotalStatsToFile(stats, h, isValidator); err != nil {
 		log.Fatal(err)
+	} else {
+		log.Printf("[%s] Total Stats written to %s\n", h.ID()[0:5].Pretty(), filename)
 	}
-	log.Printf("[%s] Total Stats written to %s\n", h.ID()[0:5].Pretty(), h.ID()[0:10].Pretty()+"_total_stats.csv")
 
-	if err := writeLatencyStatsToFile(stats, h); err != nil {
+	if filename, err := writeLatencyStatsToFile(stats, h, isValidator); err != nil {
 		log.Fatal(err)
+	} else {
+		log.Printf("[%s] Latencies written to %s\n", h.ID()[0:5].Pretty(), filename)
 	}
-	log.Printf("[%s] Latencies written to %s\n", h.ID()[0:5].Pretty(), h.ID()[0:10].Pretty()+"_latency_stats.csv")
 
 	// Cancel the context and exit
 	cancel()
@@ -147,11 +146,17 @@ func main() {
 
 }
 
-func writeTotalStatsToFile(stats *Stats, h host.Host) error {
-	// Write total stats to CSV file
-	f, err := os.Create(h.ID()[0:10].Pretty() + "_total_stats.csv")
+func writeTotalStatsToFile(stats *Stats, h host.Host, isValidator bool) (string, error) {
+	filename := ""
+	if isValidator {
+		filename = h.ID()[0:10].Pretty() + "_total_stats_validator.csv"
+	} else {
+		filename = h.ID()[0:10].Pretty() + "_total_stats_non_validator.csv"
+	}
+
+	f, err := os.Create(filename)
 	if err != nil {
-		return err
+		return filename, err
 	}
 	defer f.Close()
 
@@ -167,13 +172,20 @@ func writeTotalStatsToFile(stats *Stats, h host.Host) error {
 	w.Write(headers)
 	w.WriteAll(rows)
 	if err := w.Error(); err != nil {
-		return err
+		return filename, err
 	}
 
-	return nil
+	return filename, nil
 }
 
-func writeLatencyStatsToFile(stats *Stats, h host.Host) error {
+func writeLatencyStatsToFile(stats *Stats, h host.Host, isValidator bool) (string, error) {
+	filename := h.ID()[0:10].Pretty() + "_latency_stats.csv"
+	if isValidator {
+		filename = h.ID()[0:10].Pretty() + "_latency_stats_validator.csv"
+	} else {
+		filename = h.ID()[0:10].Pretty() + "_latency_stats_non_validator.csv"
+	}
+
 	// Convert latencies and hops to rows
 	var latencyRows [][]string
 	for i := 0; i < len(stats.PutLatencies) || i < len(stats.GetLatencies) || i < len(stats.GetHops); i++ {
@@ -199,7 +211,7 @@ func writeLatencyStatsToFile(stats *Stats, h host.Host) error {
 	// Write latency stats to CSV file
 	f, err := os.Create(h.ID()[0:10].Pretty() + "_latency_stats.csv")
 	if err != nil {
-		return err
+		return filename, err
 	}
 	defer f.Close()
 
@@ -213,10 +225,10 @@ func writeLatencyStatsToFile(stats *Stats, h host.Host) error {
 	w.Write(headers)
 	w.WriteAll(rows)
 	if err := w.Error(); err != nil {
-		return err
+		return filename, err
 	}
 
-	return nil
+	return filename, nil
 }
 
 type addrList []multiaddr.Multiaddr
