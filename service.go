@@ -20,7 +20,6 @@ type Service struct {
 	rpcClient *rpc.Client
 	host      host.Host
 	protocol  protocol.ID
-	counter   int
 }
 
 func NewService(host host.Host, protocol protocol.ID) *Service {
@@ -43,7 +42,7 @@ func (s *Service) SetupRPC() error {
 	return nil
 }
 
-func (s *Service) StartMessaging(dht *dht.IpfsDHT, stats *Stats, isValidator bool, ctx context.Context) {
+func (s *Service) StartMessaging(dht *dht.IpfsDHT, stats *Stats, peerType string, ctx context.Context) {
 	ticker := time.NewTicker(time.Second * 1)
 	defer ticker.Stop()
 
@@ -55,7 +54,7 @@ func (s *Service) StartMessaging(dht *dht.IpfsDHT, stats *Stats, isValidator boo
 			var sample []byte = make([]byte, 42000)
 			peers := FilterSelf(s.host.Peerstore().Peers(), s.host.ID())
 
-			if len(peers) > 0 && isValidator {
+			if len(peers) > 0 && peerType == "validator" {
 				startTime := time.Now()
 				// ? Put sample into DHT
 				putErr := dht.PutValue(ctx, "/das/sample/"+s.host.ID().Pretty(), sample)
@@ -94,35 +93,6 @@ func (s *Service) StartMessaging(dht *dht.IpfsDHT, stats *Stats, isValidator boo
 			// s.Echo(dht, samples, ctx)
 		}
 	}
-}
-
-func (s *Service) Echo(dht *dht.IpfsDHT, samples []byte, ctx context.Context) {
-
-	// sampleKey := "sample key"
-	// if value, err := dht.GetValue(ctx, sampleKey); err != nil {
-	//  fmt.Println("Error getting value from DHT:")
-	//  log.Fatal(err)
-	// } else if value != nil {
-	//  fmt.Println("Got value from DHT: ", value)
-	// }
-
-	// peers := FilterSelf(s.host.Peerstore().Peers(), s.host.ID())
-	// var replies = make([]*Envelope, len(peers))
-
-	// errs := s.rpcClient.MultiCall(
-	//  Ctxts(len(peers)),
-	//  peers,
-	//  EchoService,
-	//  EchoServiceFuncEcho,
-	//  Envelope{Samples: samples},
-	//  CopyEnvelopesToIfaces(replies),
-	// )
-
-	// for i, err := range errs {
-	//  if err != nil {
-	//      fmt.Printf("Peer %s returned error: %-v\n", peers[i].Pretty(), err)
-	//  }
-	// }
 }
 
 func (s *Service) ReceiveEcho(envelope Envelope) Envelope {

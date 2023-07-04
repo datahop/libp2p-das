@@ -13,16 +13,11 @@ import (
 	"github.com/multiformats/go-multiaddr"
 )
 
-func NewHost(ctx context.Context, seed int64, port int) (host.Host, bool, error) {
-
-	isValidator := false
-
-	// If the seed is zero, use real cryptographic randomness. Otherwise, use a
-	// deterministic randomness source to make generated keys stay the same
-	// across multiple runs
+func NewHost(ctx context.Context, seed int64, port int) (host.Host, string, error) {
 
 	var r io.Reader
 	var crypto_code int
+	var peerType string
 
 	if seed == 0 {
 		r = rand.Reader
@@ -34,7 +29,7 @@ func NewHost(ctx context.Context, seed int64, port int) (host.Host, bool, error)
 
 	priv, _, err := crypto.GenerateKeyPairWithReader(crypto_code, 2048, r)
 	if err != nil {
-		return nil, isValidator, err
+		return nil, peerType, err
 	}
 
 	addr, _ := multiaddr.NewMultiaddr(fmt.Sprintf("/ip4/0.0.0.0/tcp/%d", port))
@@ -45,13 +40,16 @@ func NewHost(ctx context.Context, seed int64, port int) (host.Host, bool, error)
 	)
 
 	if err != nil {
-		return nil, isValidator, err
+		return nil, peerType, err
 	}
 
 	// Randomly choose if this node is a validator or not
+	// mrand.Intn(2) returns either 0 or 1
 	if mrand.Intn(2) == 0 {
-		isValidator = true
+		peerType = "validator"
+	} else {
+		peerType = "nonValidator"
 	}
 
-	return host, isValidator, nil
+	return host, peerType, nil
 }
