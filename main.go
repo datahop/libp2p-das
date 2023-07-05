@@ -29,7 +29,7 @@ type Config struct {
 
 type Stats struct {
 	TotalPutMessages int
-	TotalFailedPuts int
+	TotalFailedPuts  int
 	TotalGetMessages int
 	TotalFailedGets  int
 	TotalSuccessGets int
@@ -70,7 +70,7 @@ func main() {
 	flag.Var(&config.DiscoveryPeers, "peer", "Peer multiaddress for peer discovery")
 	flag.StringVar(&config.ProtocolID, "protocolid", "/p2p/rpc", "")
 	flag.IntVar(&config.Port, "port", 0, "")
-	flag.IntVar(&config.Duration, "duration", 15, "How long to run the test for (in seconds).")
+	flag.IntVar(&config.Duration, "duration", 30, "How long to run the test for (in seconds).")
 	flag.BoolVar(&debugMode, "debug", false, "Enable debug mode - see more messages about what is happening.")
 	flag.Parse()
 
@@ -78,6 +78,7 @@ func main() {
 		log.Printf("Running libp2p-das with the following config:\n")
 		log.Printf("\tRendezvous: %s\n", config.Rendezvous)
 		log.Printf("\tSeed: %d\n", config.Seed)
+		log.Printf("\tDuration: %d\n", config.Duration)
 		log.Printf("\tDiscoveryPeers: %s\n", config.DiscoveryPeers)
 		log.Printf("\tProtocolID: %s\n", config.ProtocolID)
 		log.Printf("\tPort: %d\n\n", config.Port)

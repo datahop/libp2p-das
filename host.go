@@ -21,7 +21,7 @@ func NewHost(ctx context.Context, seed int64, port int) (host.Host, string, erro
 
 	// Randomly choose if this node is a validator or not
 	// mrand.Intn(x) returns a random int between 0 and x-1
-	if mrand.Intn(10) < 2 {
+	if mrand.Intn(10) < 5 {
 		peerType = "validator"
 	}
 
