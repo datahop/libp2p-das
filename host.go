@@ -14,15 +14,22 @@ import (
 )
 
 func NewHost(ctx context.Context, seed int64, port int) (host.Host, string, error) {
-
 	var r io.Reader
 	var crypto_code int
-	var peerType string
+
+	peerType := "nonValidator"
+
+	// Randomly choose if this node is a validator or not
+	// mrand.Intn(x) returns a random int between 0 and x-1
+	if mrand.Intn(10) < 2 {
+		peerType = "validator"
+	}
 
 	if seed == 0 {
 		r = rand.Reader
 		crypto_code = crypto.RSA
 	} else {
+		peerType = "builder"
 		r = mrand.New(mrand.NewSource(seed))
 		crypto_code = crypto.Ed25519
 	}
@@ -41,14 +48,6 @@ func NewHost(ctx context.Context, seed int64, port int) (host.Host, string, erro
 
 	if err != nil {
 		return nil, peerType, err
-	}
-
-	// Randomly choose if this node is a validator or not
-	// mrand.Intn(2) returns either 0 or 1
-	if mrand.Intn(2) == 0 {
-		peerType = "validator"
-	} else {
-		peerType = "nonValidator"
 	}
 
 	return host, peerType, nil

@@ -36,12 +36,34 @@ func Discover(ctx context.Context, h host.Host, dht *dht.IpfsDHT, rendezvous str
 					continue
 				}
 
+				// ? If the peer is not already on the network, dial it
 				if h.Network().Connectedness(p.ID) != network.Connected {
 					_, err = h.Network().DialPeer(ctx, p.ID)
 					if err != nil {
 						continue
 					}
+
+					// ? Try to add the peer to the dht routing table
+					_, err := dht.RoutingTable().TryAddPeer(p.ID, true, true)
+					if err != nil {
+						log.Printf("Failed to add peer to dht routing table\n")
+						log.Fatal(err)
+					}
+
+				} else {
+					// ? Check if the peer is already in the dht routing table
+					_, err := dht.RoutingTable().TryAddPeer(p.ID, true, true)
+					if err != nil {
+						log.Printf("Failed to add peer to dht routing table\n")
+						log.Fatal(err)
+					}
 				}
+			}
+
+			// ? Check if the number of peers and number of dht routing table peers are the same
+			if (len(peers) > 0) && (len(peers)-1 != len(dht.RoutingTable().ListPeers())) {
+				log.Printf("Found %d peers and %d dht peers\n", len(peers), len(dht.RoutingTable().ListPeers()))
+
 			}
 
 		}

@@ -29,6 +29,7 @@ type Config struct {
 
 type Stats struct {
 	TotalPutMessages int
+	TotalFailedPuts int
 	TotalGetMessages int
 	TotalFailedGets  int
 	TotalSuccessGets int
@@ -158,9 +159,9 @@ func writeTotalStatsToFile(stats *Stats, h host.Host, peerType string) (string, 
 	w := csv.NewWriter(f)
 	defer w.Flush()
 
-	headers := []string{"Total PUT messages", "Total GET messages", "Total failed GETs", "Total successful GETs"}
+	headers := []string{"Total PUT messages", "Total failed PUTs", "Total GET messages", "Total failed GETs", "Total successful GETs"}
 	rows := [][]string{
-		{strconv.Itoa(stats.TotalPutMessages), strconv.Itoa(stats.TotalGetMessages), strconv.Itoa(stats.TotalFailedGets), strconv.Itoa(stats.TotalSuccessGets)},
+		{strconv.Itoa(stats.TotalPutMessages), strconv.Itoa(stats.TotalFailedPuts), strconv.Itoa(stats.TotalGetMessages), strconv.Itoa(stats.TotalFailedGets), strconv.Itoa(stats.TotalSuccessGets)},
 	}
 
 	// Write headers and rows to CSV file
