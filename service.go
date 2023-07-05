@@ -180,30 +180,6 @@ func (s *Service) StartMessaging(dht *dht.IpfsDHT, stats *Stats, peerType string
 
 			}
 
-			// // ? Get random peer's sample from DHT
-			// if len(peers) > 0 {
-			// 	randIndex := rand.Intn(len(peers))
-			// 	randomPeer := peers[randIndex]
-			// 	startTime := time.Now()
-			// 	// ? Get sample from DHT
-			// 	_, hops, err := dht.GetValueHops(ctx, "/das/sample/"+randomPeer.Pretty())
-			// 	if err != nil {
-			// 		// log.Print("[" + s.host.ID()[0:5].Pretty() + "] GetValue() Error: " + err.Error())
-			// 		stats.GetLatencies = append(stats.GetLatencies, time.Since(startTime))
-			// 		stats.TotalFailedGets += 1
-			// 		stats.TotalGetMessages += 1
-			// 		stats.GetHops = append(stats.GetHops, hops)
-			// 	} else {
-			// 		log.Print("[" + s.host.ID()[0:5].Pretty() + "] " + colorize("GOT", "blue") + " 42KB sample for " + randomPeer[0:5].Pretty() + " from DHT.\n")
-			// 		stats.TotalSuccessGets += 1
-			// 		stats.TotalGetMessages += 1
-			// 		stats.GetLatencies = append(stats.GetLatencies, time.Since(startTime))
-			// 		stats.GetHops = append(stats.GetHops, hops)
-			// 	}
-			// }
-
-			// s.counter++
-			// s.Echo(dht, samples, ctx)
 		}
 	}
 }
