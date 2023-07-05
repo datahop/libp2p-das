@@ -49,11 +49,8 @@ func (s *Service) StartMessaging(dht *dht.IpfsDHT, stats *Stats, peerType string
 	// ? Generate 2 IDs for the blocks
 	blockIDs := make([]int, 2)
 
-	// ? Generate 512 IDs for the columns
-	colIDs := make([]int, 512)
-
-	// ? Generate 512 IDs for the rows
-	rowIDs := make([]int, 512)
+	// ? Generate 512 x 512 IDs for each sample
+	builderSampleIDs := make([]int, 512*512)
 
 	var sample []byte = make([]byte, 512)
 
@@ -70,7 +67,7 @@ func (s *Service) StartMessaging(dht *dht.IpfsDHT, stats *Stats, peerType string
 
 				// ? Generate random block ID
 				blockID := rand.Intn(2)
-				// ? Remove the colID from the colIDs
+				// ? Remove the blockID from the blockIDs
 				for i, id := range blockIDs {
 					if id == blockID {
 						blockIDs = append(blockIDs[:i], blockIDs[i+1:]...)
@@ -82,32 +79,18 @@ func (s *Service) StartMessaging(dht *dht.IpfsDHT, stats *Stats, peerType string
 					blockIDs = blockIDs[:len(blockIDs)-1]
 				}
 
-				// ? Get random colID
-				colID := rand.Intn(512)
-				// ? Remove the colID from the colIDs
-				for i, id := range colIDs {
-					if id == colID {
-						colIDs = append(colIDs[:i], colIDs[i+1:]...)
+				// ? Get random builderSampleID
+				builderSampleID := rand.Intn(512 * 512)
+				// ? Remove the builderSampleID from the builderSampleIDs
+				for i, id := range builderSampleIDs {
+					if id == builderSampleID {
+						builderSampleIDs = append(builderSampleIDs[:i], builderSampleIDs[i+1:]...)
 						break
 					}
 				}
-				// ? Decrease the length of the colIDs by 1
-				if len(colIDs) > 0 {
-					colIDs = colIDs[:len(colIDs)-1]
-				}
-
-				// ? Get random rowID
-				rowID := rand.Intn(512)
-				// ? Remove the rowID from the rowIDs
-				for i, id := range rowIDs {
-					if id == rowID {
-						rowIDs = append(rowIDs[:i], rowIDs[i+1:]...)
-						break
-					}
-				}
-				// ? Decrease the length of the rowIDs by 1
-				if len(rowIDs) > 0 {
-					rowIDs = rowIDs[:len(rowIDs)-1]
+				// ? Decrease the length of the builderSampleIDs by 1
+				if len(builderSampleIDs) > 0 {
+					builderSampleIDs = builderSampleIDs[:len(builderSampleIDs)-1]
 				}
 
 				peers := FilterSelf(s.host.Peerstore().Peers(), s.host.ID())
@@ -129,7 +112,7 @@ func (s *Service) StartMessaging(dht *dht.IpfsDHT, stats *Stats, peerType string
 				startTime := time.Now()
 
 				// ? Put sample into DHT
-				putErr := dht.PutValue(ctx, "/das/sample/"+s.host.ID().Pretty()+"/"+fmt.Sprint(blockID)+"/"+fmt.Sprint(colID)+"/"+fmt.Sprint(rowID), sample)
+				putErr := dht.PutValue(ctx, "/das/sample/"+s.host.ID().Pretty()+"/"+fmt.Sprint(blockID)+"/"+fmt.Sprint(builderSampleID), sample)
 
 				if putErr != nil {
 					log.Print("[BUILDER\t" + s.host.ID()[0:5].Pretty() + "] PutValue() Error: " + putErr.Error())
@@ -138,26 +121,13 @@ func (s *Service) StartMessaging(dht *dht.IpfsDHT, stats *Stats, peerType string
 					stats.PutLatencies = append(stats.PutLatencies, time.Since(startTime))
 				}
 
-				log.Print("[BUILDER\t" + s.host.ID()[0:5].Pretty() + "] " + colorize("PUT", "green") + " sample (" + fmt.Sprint(blockID) + ", " + fmt.Sprint(colID) + ", " + fmt.Sprint(rowID) + ") into DHT.\n")
+				log.Print("[BUILDER\t" + s.host.ID()[0:5].Pretty() + "] " + colorize("PUT", "green") + " sample (" + fmt.Sprint(blockID) + ", " + fmt.Sprint(builderSampleID) + ") into DHT.\n")
 				stats.TotalPutMessages += 1
 				stats.PutLatencies = append(stats.PutLatencies, time.Since(startTime))
 
 			} else if peerType == "validator" {
 				continue
 			}
-
-			// if len(peers) > 0 && peerType == "validator" {
-			// 	startTime := time.Now()
-			// 	// ? Put sample into DHT
-			// 	putErr := dht.PutValue(ctx, "/das/sample/"+s.host.ID().Pretty(), sample)
-			// 	if putErr != nil {
-			// 		stats.PutLatencies = append(stats.PutLatencies, time.Since(startTime))
-			// 		log.Print("[" + s.host.ID()[0:5].Pretty() + "] PutValue() Error: " + putErr.Error())
-			// 	}
-			// 	log.Print("[" + s.host.ID()[0:5].Pretty() + "] " + colorize("PUT", "green") + " 42KB sample into DHT.\n")
-			// 	stats.TotalPutMessages += 1
-			// 	stats.PutLatencies = append(stats.PutLatencies, time.Since(startTime))
-			// }
 
 			// // ? Get random peer's sample from DHT
 			// if len(peers) > 0 {
