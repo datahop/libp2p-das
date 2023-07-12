@@ -136,6 +136,7 @@ func (s *Service) StartMessaging(dht *dht.IpfsDHT, stats *Stats, peerType string
 					// log.Print("[VALIDATOR\t" + s.host.ID()[0:5].Pretty() + "] GetValue(/das/sample/" + fmt.Sprint(currentBlockID) + "/" + fmt.Sprint(randomSampleID) + ") Error: " + err.Error())
 					stats.TotalFailedGets += 1
 					stats.TotalGetMessages += 1
+					stats.GetLatencies = append(stats.GetLatencies, time.Since(startTime))
 					stats.GetHops = append(stats.GetHops, hops)
 				} else {
 					log.Print("[VALIDATOR\t" + s.host.ID()[0:5].Pretty() + "] " + colorize("GET", "blue") + " sample (" + fmt.Sprint(blockID) + ", " + fmt.Sprint(randomSampleID) + ") from DHT.\n")
@@ -163,6 +164,7 @@ func (s *Service) StartMessaging(dht *dht.IpfsDHT, stats *Stats, peerType string
 					// log.Print("[NON VALIDATOR\t" + s.host.ID()[0:5].Pretty() + "] GetValue(/das/sample/" + fmt.Sprint(currentBlockID) + "/" + fmt.Sprint(randomSampleID) + ") Error: " + err.Error())
 					stats.TotalFailedGets += 1
 					stats.TotalGetMessages += 1
+					stats.GetLatencies = append(stats.GetLatencies, time.Since(startTime))
 					stats.GetHops = append(stats.GetHops, hops)
 				} else {
 					log.Print("[NON VALIDATOR\t" + s.host.ID()[0:5].Pretty() + "] " + colorize("GET", "blue") + " sample (" + fmt.Sprint(blockID) + ", " + fmt.Sprint(randomSampleID) + ") from DHT.\n")
