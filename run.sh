@@ -27,18 +27,21 @@ cd libp2p-das-datahop
 
 # Run builders
 for ((i=1; i<=$builder_count; i++))
+    echo "Running builder $i"
     do
         go run . -debug -seed 1234 -port 61960 -nodeType builder -duration $duration &
     done
 
 # Run validators
 for ((i=1; i<=$validator_count; i++))
+    echo "Running validator $i"
     do
         go run . -debug -duration $duration -nodeType validator -peer /ip4/127.0.0.1/tcp/61960/p2p/12D3KooWE3AwZFT9zEWDUxhya62hmvEbRxYBWaosn7Kiqw5wsu73 &
     done
 
 # Run non validators
 for ((i=1; i<=$non_validator_count; i++))
+    echo "Running non validator $i"
     do
         go run . -debug -duration $duration -nodeType nonvalidator -peer /ip4/127.0.0.1/tcp/61960/p2p/12D3KooWE3AwZFT9zEWDUxhya62hmvEbRxYBWaosn7Kiqw5wsu73 &
     done
