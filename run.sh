@@ -23,7 +23,7 @@ export PATH=$PATH:/usr/local/go/bin
 
 #Build and run experiment
 git clone https://github.com/Blitz3r123/libp2p-das-datahop.git
-cd ../libp2p-das-datahop
+cd libp2p-das-datahop
 
 # Run builders
 for ((i=1; i<=$builder_count; i++))
@@ -48,3 +48,6 @@ if [!-d $result_dir]; then
 fi;
 mkdir $result_dir/$experiment_name_$(date +%d-%m-%y-%H-%M)
 cp *.csv $result_dir/$experiment_name_$(date +%d-%m-%y-%H-%M)
+rm -rf *.csv
+cd ..
+rm -rf libp2p-das-datahop
