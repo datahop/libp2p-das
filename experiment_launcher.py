@@ -21,9 +21,9 @@ login = "kpeeroo"
 nb_node = 10
 nb_builder = 1
 nb_validator = 1
+duration_secs = 30
+experiment_name = f"{nb_node}_nodes_{duration_secs}_secs"
 nb_non_validator = nb_node - nb_validator - nb_builder
-arguments = 30
-experiment_name = f"{nb_node}_nodes_{arguments}_secs"
 
 nb_node_per_cpu = nb_node//10
 
@@ -55,13 +55,13 @@ netem = en.NetemHTB()
 netem.deploy()
 netem.validate()
 
-print(f"Running:\n\t/home/{login}/run.sh {arguments} {experiment_name} {nb_builder} {nb_validator} {nb_non_validator}")
+print(f"Running:\n\t/home/{login}/run.sh {duration_secs} {experiment_name} {nb_builder} {nb_validator} {nb_non_validator}")
 
 with en.actions(roles=roles["first"], on_error_continue=True, background=True) as p:
-    p.shell(f"/home/{login}/run.sh {arguments} {experiment_name} {nb_builder} {nb_validator} {nb_non_validator}")
+    p.shell(f"/home/{login}/run.sh {duration_secs} {experiment_name} {nb_builder} {nb_validator} {nb_non_validator}")
 
 x = datetime.datetime.now()
-h,m,s = convert_seconds_to_time(arguments)
+h,m,s = convert_seconds_to_time(duration_secs)
 print("Begin at: ",x)
 print("Expected to finish at: ",add_time(x,h,m,s))
 

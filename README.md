@@ -1,32 +1,36 @@
-# How to run
-## Normal
-```shell
-./run.sh <is_bootstrap> <execution_duration_in_secs>
-```
+# Introduction
 
+## `run.sh`
+For local use.
+```shell
+run.sh <duration> <experiment_name> <builder_count> <validator_count> <non-validator_count>
+```
 Example:
-Running 3 peers with 1 being the bootstrap node for 20 seconds.
 ```shell
-./run.sh bootstrap 20
-./run.sh 20
-./run.sh 20
+run.sh 30 my_exp_with_10_nodes 1 4 5
 ```
 
-## Testing
+## `test.bat`
+For local use.
 ```shell
-./test.sh <node_count> <debug_mode>
+test.bat <duration> <builder_count> <validator_count> <non-validator_count>
+```
+Example:
+```shell
+test.bat 30 1 1 2
 ```
 
-Example: 
-Running 3 peers.
-```shell
-./test.sh 3
+## `experiment_launcher.py`
+For grid5k use.
+Just set values to the following variables in the script:
+```txt
+login
+nb_node
+nb_builder
+nb_validator
+duration_secs
 ```
-
-# Logging
-What do I log?
-- # of put message
-- # of get messages
-    - # of successful gets
-    - # of failed gets
-- latencies per message
+Then run using python:
+```shell
+python3 experiment_launcher.py
+```
