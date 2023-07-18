@@ -1,28 +1,45 @@
 @echo off
 
-if "%~1"=="" (
-    echo Please enter at least 1 parameter. The first parameter is a number and the second parameter is optional and can be 'debug'.
+set duration=%1
+set builderCount=%2
+set validatorCount=%3
+set nonValidatorCount=%4
+
+if "%duration%"=="" (
+    echo There should be 4 parameters: duration, builderCount, validatorCount, and nonValidatorCount. e.g. test.bat 30 1 2 1
+    exit /b
+) else if "%builderCount%"=="" (
+    echo There should be 4 parameters: duration, builderCount, validatorCount, and nonValidatorCount. e.g. test.bat 30 1 2 1
+    exit /b
+) else if "%validatorCount%"=="" (
+    echo There should be 4 parameters: duration, builderCount, validatorCount, and nonValidatorCount. e.g. test.bat 30 1 2 1
+    exit /b
+) else if "%nonValidatorCount%"=="" (
+    echo There should be 4 parameters: duration, builderCount, validatorCount, and nonValidatorCount. e.g. test.bat 30 1 2 1
     exit /b
 )
 
-if "%~2"=="debug" (
-    echo Starting libp2p-das with %~1 peers in debug mode.
-) else (
-    echo Starting libp2p-das with %~1 peers.
+set /a builderCount=%builderCount%
+if %builderCount% leq 0 (
+    echo builderCount should be greater than 0.
+    exit /b
 )
 
-start "" go run . -debug -seed 1234 -port 61960 -duration 30
+set /a nonBuilderCount=%validatorCount%+%nonValidatorCount%
 
-timeout /t 2
-
-for /l %%i in (1,1,%~1) do (
-    if "%~2"=="debug" (
-        start "" go run . -debug -duration 30 -peer /ip4/127.0.0.1/tcp/61960/p2p/12D3KooWE3AwZFT9zEWDUxhya62hmvEbRxYBWaosn7Kiqw5wsu73
-        timeout /t 1
-    ) else (
-        start "" go run .  -duration 30 -peer /ip4/127.0.0.1/tcp/61960/p2p/12D3KooWE3AwZFT9zEWDUxhya62hmvEbRxYBWaosn7Kiqw5wsu73
-        timeout /t 1
-    )
+if %nonBuilderCount% leq 0 (
+    echo The sum of validatorCount and nonValidatorCount should be greater than 0.
+    exit /b
 )
 
-timeout /t 35
+for /L %%i in (1,1,%builderCount%) do (
+    start run.bat %duration% builder
+)
+
+for /L %%i in (1,1,%validatorCount%) do (
+    start run.bat %duration% validator
+)
+
+for /L %%i in (1,1,%nonValidatorCount%) do (
+    start run.bat %duration% nonvalidator
+)

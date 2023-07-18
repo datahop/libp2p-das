@@ -18,6 +18,7 @@ import (
 )
 
 type Config struct {
+	NodeType       string
 	Port           int
 	ProtocolID     string
 	Rendezvous     string
@@ -66,6 +67,7 @@ func main() {
 	var debugMode bool = false
 
 	flag.StringVar(&config.Rendezvous, "rendezvous", "/echo", "")
+	flag.StringVar(&config.NodeType, "nodeType", "validator", "The node type to run (validator, nonvalidator, builder)")
 	flag.Int64Var(&config.Seed, "seed", 0, "Seed value for generating a PeerID, 0 is random")
 	flag.Var(&config.DiscoveryPeers, "peer", "Peer multiaddress for peer discovery")
 	flag.StringVar(&config.ProtocolID, "protocolid", "/p2p/rpc", "")
@@ -73,6 +75,8 @@ func main() {
 	flag.IntVar(&config.Duration, "duration", 30, "How long to run the test for (in seconds).")
 	flag.BoolVar(&debugMode, "debug", false, "Enable debug mode - see more messages about what is happening.")
 	flag.Parse()
+
+	nodeType := strings.ToLower(config.NodeType)
 
 	if debugMode {
 		log.Printf("Running libp2p-das with the following config:\n")
@@ -86,7 +90,7 @@ func main() {
 
 	ctx, cancel := context.WithCancel(context.Background())
 
-	h, peerType, err := NewHost(ctx, config.Seed, config.Port)
+	h, err := NewHost(ctx, config.Seed, config.Port)
 
 	if err != nil {
 		fmt.Printf("NewHost() failed\n")
@@ -119,20 +123,20 @@ func main() {
 
 	// Start the messaging service in a separate goroutine
 	go func() {
-		service.StartMessaging(dht, stats, peerType, ctx)
+		service.StartMessaging(dht, stats, nodeType, ctx)
 	}()
 
 	// Wait for the timer to expire
 	<-timer.C
 	log.Printf("Timer expired, shutting down...\n")
 
-	if filename, err := writeTotalStatsToFile(stats, h, peerType); err != nil {
+	if filename, err := writeTotalStatsToFile(stats, h, nodeType); err != nil {
 		log.Fatal(err)
 	} else {
 		log.Printf("[%s] Total Stats written to %s\n", h.ID()[0:5].Pretty(), filename)
 	}
 
-	if filename, err := writeLatencyStatsToFile(stats, h, peerType); err != nil {
+	if filename, err := writeLatencyStatsToFile(stats, h, nodeType); err != nil {
 		log.Fatal(err)
 	} else {
 		log.Printf("[%s] Latencies written to %s\n", h.ID()[0:5].Pretty(), filename)
@@ -148,8 +152,8 @@ func main() {
 
 }
 
-func writeTotalStatsToFile(stats *Stats, h host.Host, peerType string) (string, error) {
-	filename := h.ID()[0:10].Pretty() + "_total_stats_" + peerType + ".csv"
+func writeTotalStatsToFile(stats *Stats, h host.Host, nodeType string) (string, error) {
+	filename := h.ID()[0:10].Pretty() + "_total_stats_" + nodeType + ".csv"
 
 	f, err := os.Create(filename)
 	if err != nil {
@@ -175,8 +179,8 @@ func writeTotalStatsToFile(stats *Stats, h host.Host, peerType string) (string, 
 	return filename, nil
 }
 
-func writeLatencyStatsToFile(stats *Stats, h host.Host, peerType string) (string, error) {
-	filename := h.ID()[0:10].Pretty() + "_latency_stats_" + peerType + ".csv"
+func writeLatencyStatsToFile(stats *Stats, h host.Host, nodeType string) (string, error) {
+	filename := h.ID()[0:10].Pretty() + "_latency_stats_" + nodeType + ".csv"
 
 	// Convert latencies and hops to rows
 	var latencyRows [][]string

@@ -154,7 +154,7 @@ func (s *Service) StartMessaging(dht *dht.IpfsDHT, stats *Stats, peerType string
 					samplesReceived = make([]int, 0)
 				}
 
-			} else if peerType == "nonValidator" {
+			} else if peerType == "nonvalidator" {
 				randomSampleID := rand.Intn(TotalSamplesCount)
 
 				startTime := time.Now()
