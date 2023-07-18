@@ -32,7 +32,6 @@ network = en.G5kNetworkConf(type="prod", roles=["experiment_network"], site="nan
 conf = (
     en.G5kConf.from_settings(job_name="Louvain-job-1", walltime="00:02:00")
     .add_network_conf(network)
-    #.add_machine(roles=["experiment"], cluster="gros", nodes=nb_node-1, primary_network=network)
     .add_machine(roles=["first"], cluster="grisou", nodes=10, primary_network=network)
     .finalize()
 )
@@ -56,13 +55,10 @@ netem = en.NetemHTB()
 netem.deploy()
 netem.validate()
 
+print(f"Running:\n\t/home/{login}/run.sh {arguments} {experiment_name} {nb_builder} {nb_validator} {nb_non_validator}")
+
 with en.actions(roles=roles["first"], on_error_continue=True, background=True) as p:
     p.shell(f"/home/{login}/run.sh {arguments} {experiment_name} {nb_builder} {nb_validator} {nb_non_validator}")
-#with en.actions(roles=roles["experiment"]) as p:
-#    p.shell("/home/mapigaglio/run1.sh "  + str(arguments))
-#launch script with list of nodes for arguments
-#results = en.run_command("/home/mapigaglio/run1.sh "  + str(arguments), roles=roles["first"])
-#results = en.run_command("/home/mapigaglio/run2.sh "  + str(arguments), roles=roles["experiments"])
 
 x = datetime.datetime.now()
 h,m,s = convert_seconds_to_time(arguments)

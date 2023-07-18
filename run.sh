@@ -13,7 +13,7 @@ builder_count=$3
 validator_count=$4
 non_validator_count=$5
 
-result_dir="/home/kpeeroo/result/"
+result_dir="/home/kpeeroo/result"
 
 #Install go
 cd /tmp
@@ -23,7 +23,7 @@ export PATH=$PATH:/usr/local/go/bin
 
 #Build and run experiment
 git clone https://github.com/Blitz3r123/libp2p-das-datahop.git
-cd libp2p-das-datahop
+cd ../libp2p-das-datahop
 
 # Run builders
 for ((i=1; i<=$builder_count; i++))
