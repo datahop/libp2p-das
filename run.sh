@@ -59,6 +59,3 @@ if [!-d $result_dir]; then
 fi;
 mkdir $result_dir/$experiment_name_$(date +%d-%m-%y-%H-%M)
 cp *.csv $result_dir/$experiment_name_$(date +%d-%m-%y-%H-%M)
-rm -rf *.csv
-cd ..
-rm -rf libp2p-das-datahop
