@@ -66,9 +66,8 @@ if [ $(($non_validator_count)) -ne 0 ]; then
 fi;
 
 
-#if [!-d $result_dir]; then
-#    mkdir -p $result_dir;
-#fi;
-pwd
-#mkdir $result_dir/$experiment_name_$(date +%d-%m-%y-%H-%M)
-#cp *.csv $result_dir/$experiment_name_$(date +%d-%m-%y-%H-%M)
+if [!-d $result_dir]; then
+    mkdir -p $result_dir;
+fi;
+mkdir $result_dir/$experiment_name_$(date +%d-%m-%y-%H-%M)
+cp *.csv $result_dir/$experiment_name_$(date +%d-%m-%y-%H-%M)
