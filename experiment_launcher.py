@@ -64,7 +64,7 @@ finish_time = add_time(x,h,m,s)
 print("Begin at: ",x)
 print("Expected to finish at: ", finish_time)
 
-print(f"Results will be available at: {dir_path}/results/{experiment_name}_{finish_time}")
+print(f"Results will be available at: /results/{experiment_name}_{finish_time}")
 
 # Release all Grid'5000 resources
 #netem.destroy()
