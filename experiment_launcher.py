@@ -23,7 +23,7 @@ nb_builder = 1
 nb_validator = 50
 duration_secs = 30
 nb_non_validator = nb_node - nb_validator - nb_builder
-experiment_name = f"{nb_node}_nodes_{duration_secs}_secs"
+experiment_name = f"{nb_builder}_builders_{nb_validator}_validators_{nb_non_validator}_nonvalidators_{duration_secs}_secs"
 
 nb_node_per_cpu = nb_node//10
 
