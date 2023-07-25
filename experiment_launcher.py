@@ -27,12 +27,12 @@ experiment_name = f"{nb_node}_nodes_{duration_secs}_secs"
 
 nb_node_per_cpu = nb_node//10
 
-network = en.G5kNetworkConf(type="prod", roles=["experiment_network"], site="nancy")
+network = en.G5kNetworkConf(type="prod", roles=["experiment_network"], site="grenoble")
 
 conf = (
     en.G5kConf.from_settings(job_name="Louvain-job-1", walltime="00:02:00")
     .add_network_conf(network)
-    .add_machine(roles=["first"], cluster="gros", nodes=10, primary_network=network)
+    .add_machine(roles=["first"], cluster="dahu", nodes=10, primary_network=network)
     .finalize()
 )
 
@@ -60,8 +60,11 @@ with en.actions(roles=roles["first"], on_error_continue=True, background=True) a
 
 x = datetime.datetime.now()
 h,m,s = convert_seconds_to_time(duration_secs)
+finish_time = add_time(x,h,m,s)
 print("Begin at: ",x)
-print("Expected to finish at: ",add_time(x,h,m,s))
+print("Expected to finish at: ", finish_time)
+
+print(f"Results will be available at: {dir_path}/results/{experiment_name}_{finish_time}")
 
 # Release all Grid'5000 resources
 #netem.destroy()

@@ -13,7 +13,7 @@ builder_count=$3
 validator_count=$4
 non_validator_count=$5
 
-result_dir="/home/kpeeroo/result"
+result_dir="/home/kpeeroo/results"
 
 #Install go
 echo "Installing go"
@@ -66,7 +66,7 @@ if [ $(($non_validator_count)) -ne 0 ]; then
 fi;
 
 
-if [!-d $result_dir]; then
+if [ ! -d $result_dir ]; then
     mkdir -p $result_dir;
 fi;
 
