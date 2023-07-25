@@ -13,7 +13,7 @@ builder_count=$3
 validator_count=$4
 non_validator_count=$5
 
-result_dir="result"
+result_dir="/home/kpeeroo/result"
 
 #Install go
 echo "Installing go"
@@ -69,5 +69,8 @@ fi;
 if [!-d $result_dir]; then
     mkdir -p $result_dir;
 fi;
-mkdir $result_dir/$experiment_name_$(date +%d-%m-%y-%H-%M)
-cp *.csv $result_dir/$experiment_name_$(date +%d-%m-%y-%H-%M)
+
+$finish_time = $(date +%d-%m-%y-%H-%M)
+
+mkdir "${result_dir}/${experiment_name}_${finish_time}}"
+cp *.csv "${result_dir}/${experiment_name}_${finish_time}}"

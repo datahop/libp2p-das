@@ -18,12 +18,12 @@ en.init_logging(level=logging.INFO)
 en.check()
 
 login = "kpeeroo"
-nb_node = 10
+nb_node = 101
 nb_builder = 1
-nb_validator = 1
+nb_validator = 50
 duration_secs = 30
-experiment_name = f"{nb_node}_nodes_{duration_secs}_secs"
 nb_non_validator = nb_node - nb_validator - nb_builder
+experiment_name = f"{nb_node}_nodes_{duration_secs}_secs"
 
 nb_node_per_cpu = nb_node//10
 
@@ -32,7 +32,7 @@ network = en.G5kNetworkConf(type="prod", roles=["experiment_network"], site="nan
 conf = (
     en.G5kConf.from_settings(job_name="Louvain-job-1", walltime="00:02:00")
     .add_network_conf(network)
-    .add_machine(roles=["first"], cluster="grisou", nodes=10, primary_network=network)
+    .add_machine(roles=["first"], cluster="gros", nodes=10, primary_network=network)
     .finalize()
 )
 
@@ -54,8 +54,6 @@ netem = en.NetemHTB()
 
 netem.deploy()
 netem.validate()
-
-print(f"Running:\n\t/home/{login}/run.sh {duration_secs} {experiment_name} {nb_builder} {nb_validator} {nb_non_validator}")
 
 with en.actions(roles=roles["first"], on_error_continue=True, background=True) as p:
     p.shell(f"/home/{login}/run.sh {duration_secs} {experiment_name} {nb_builder} {nb_validator} {nb_non_validator}")
