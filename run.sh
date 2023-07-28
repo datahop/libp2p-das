@@ -59,7 +59,7 @@ fi;
 for ((i=0; i<$validator_count - 1; i++))
 do
     echo "[BACKGROUND] Running validator $i"
-    go run . -debug -duration $exp_duration -nodeType validator -peer /ip4/127.0.0.1/tcp/61960/p2p/12D3KooWE3AwZFT9zEWDUxhya62hmvEbRxYBWaosn7Kiqw5wsu73 &
+    go run . -debug -duration $exp_duration -nodeType validator -peer /ip4/0.0.0.0/tcp/61960/p2p/12D3KooWE3AwZFT9zEWDUxhya62hmvEbRxYBWaosn7Kiqw5wsu73 &
     sleep 0.01
 done
 
@@ -67,24 +67,24 @@ if [ $(($non_validator_count)) -eq 0 ]
 then
     if [ $(($validator_count)) -ne 0 ]; then
         echo "[FOREGROUND] Running validator $i"
-        go run . -debug -duration $exp_duration -nodeType validator -peer /ip4/127.0.0.1/tcp/61960/p2p/12D3KooWE3AwZFT9zEWDUxhya62hmvEbRxYBWaosn7Kiqw5wsu73
+        go run . -debug -duration $exp_duration -nodeType validator -peer /ip4/0.0.0.0/tcp/61960/p2p/12D3KooWE3AwZFT9zEWDUxhya62hmvEbRxYBWaosn7Kiqw5wsu73
     fi;
 else
     echo "[BACKGROUND] Running validator $i"
-    go run . -debug -duration $exp_duration -nodeType validator -peer /ip4/127.0.0.1/tcp/61960/p2p/12D3KooWE3AwZFT9zEWDUxhya62hmvEbRxYBWaosn7Kiqw5wsu73 &
+    go run . -debug -duration $exp_duration -nodeType validator -peer /ip4/0.0.0.0/tcp/61960/p2p/12D3KooWE3AwZFT9zEWDUxhya62hmvEbRxYBWaosn7Kiqw5wsu73 &
 fi
 
 # Run non validators
 for ((i=0; i<$non_validator_count - 1; i++))
 do
     echo "[BACKGROUND] Running non validator $i"
-    go run . -debug -duration $exp_duration -nodeType nonvalidator -peer /ip4/127.0.0.1/tcp/61960/p2p/12D3KooWE3AwZFT9zEWDUxhya62hmvEbRxYBWaosn7Kiqw5wsu73 &
+    go run . -debug -duration $exp_duration -nodeType nonvalidator -peer /ip4/0.0.0.0/tcp/61960/p2p/12D3KooWE3AwZFT9zEWDUxhya62hmvEbRxYBWaosn7Kiqw5wsu73 &
     sleep 0.01
 done
 
 if [ $(($non_validator_count)) -ne 0 ]; then
     echo "[FOREGROUND] Running non validator $i"
-    go run . -debug -duration $exp_duration -nodeType nonvalidator -peer /ip4/127.0.0.1/tcp/61960/p2p/12D3KooWE3AwZFT9zEWDUxhya62hmvEbRxYBWaosn7Kiqw5wsu73
+    go run . -debug -duration $exp_duration -nodeType nonvalidator -peer /ip4/0.0.0.0/tcp/61960/p2p/12D3KooWE3AwZFT9zEWDUxhya62hmvEbRxYBWaosn7Kiqw5wsu73
 fi;
 
 cp *.csv "$result_dir"
