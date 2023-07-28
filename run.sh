@@ -79,5 +79,5 @@ if [ $(($non_validator_count)) -ne 0 ]; then
     go run . -debug -duration $exp_duration -nodeType nonvalidator -peer /ip4/127.0.0.1/tcp/61960/p2p/12D3KooWE3AwZFT9zEWDUxhya62hmvEbRxYBWaosn7Kiqw5wsu73
 fi;
 
-cp *.csv "${result_dir}/${experiment_name}_${finish_time}}"
+cp *.csv "${result_dir}/${experiment_name}_${finish_time}"
 cp sar_logs "${result_dir}/${experiment_name}_${finish_time}"
