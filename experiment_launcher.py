@@ -75,10 +75,10 @@ def main():
     launch_script = dir_path +"/" + "run.sh"
 
     #Experiment parameters
-    nb_cluster_machine = 10         #Number of machine booked on the cluster
-    nb_experiment_node = 160        #Number of nodes running for the experiment
+    nb_cluster_machine = 2         #Number of machine booked on the cluster
+    nb_experiment_node = 21        #Number of nodes running for the experiment
     nb_builder = 1
-    nb_validator = 40
+    nb_validator = 10
     nb_regular = nb_experiment_node - nb_builder - nb_validator
     exp_duration = 60               #In seconds
     experiment_name = f"PANDAS_libp2p_{nb_builder}b_{nb_validator}v_{nb_regular}r_{exp_duration}sec_"
@@ -102,7 +102,7 @@ def main():
     network = en.G5kNetworkConf(type="prod", roles=["experiment_network"], site=site)
     
     Job_walltime = seconds_to_hh_mm_ss(exp_duration + 120)
-    
+
     conf = (
         en.G5kConf.from_settings(job_name=job_name, walltime=Job_walltime)
         .add_network_conf(network)

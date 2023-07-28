@@ -16,9 +16,12 @@ login=$6
 
 result_dir="/home/${login}/results"
 finish_time=$(date +%d-%m-%y-%H-%M)
-result_dir="${result_dir}/${experiment_name}_${finish_time}"
+result_dir="$result_dir/$experiment_name_$finish_time"
+
+echo "result dir: $result_dir"
 
 if [ ! -d "$result_dir" ]; then
+    echo "Creating result directory: $result_dir"
     mkdir -p "$result_dir"
 fi
 
@@ -39,7 +42,7 @@ echo "Running builders"
 for ((i=1; i<=$builder_count; i++))
 do
     echo "Running builder $i"
-    go run . -debug -seed 1234 -port 61960 -nodeType builder -duration $duration &
+    go run . -debug -seed 1234 -port 61960 -nodeType builder -duration $exp_duration &
     sleep 0.01
 done
 
@@ -48,15 +51,15 @@ echo "Running validators"
 for ((i=0; i<=$validator_count - 1; i++))
 do
     echo "Running validator $i"
-    go run . -debug -duration $duration -nodeType validator -peer /ip4/127.0.0.1/tcp/61960/p2p/12D3KooWE3AwZFT9zEWDUxhya62hmvEbRxYBWaosn7Kiqw5wsu73 &
+    go run . -debug -duration $exp_duration -nodeType validator -peer /ip4/127.0.0.1/tcp/61960/p2p/12D3KooWE3AwZFT9zEWDUxhya62hmvEbRxYBWaosn7Kiqw5wsu73 &
     sleep 0.01
 done
 
 if [ $(($non_validator_count)) -eq 0 ]
 then
-    go run . -debug -seed 1234 -port 61960 -nodeType validator -duration $duration
+    go run . -debug -seed 1234 -port 61960 -nodeType validator -duration $exp_duration
 else
-    go run . -debug -seed 1234 -port 61960 -nodeType validator -duration $duration &
+    go run . -debug -seed 1234 -port 61960 -nodeType validator -duration $exp_duration &
 fi
 
 echo "Running non-validators"
@@ -64,12 +67,12 @@ echo "Running non-validators"
 for ((i=0; i<=$non_validator_count - 1; i++))
 do
     echo "Running non validator $i"
-    go run . -debug -duration $duration -nodeType nonvalidator -peer /ip4/127.0.0.1/tcp/61960/p2p/12D3KooWE3AwZFT9zEWDUxhya62hmvEbRxYBWaosn7Kiqw5wsu73 &
+    go run . -debug -duration $exp_duration -nodeType nonvalidator -peer /ip4/127.0.0.1/tcp/61960/p2p/12D3KooWE3AwZFT9zEWDUxhya62hmvEbRxYBWaosn7Kiqw5wsu73 &
     sleep 0.01
 done
 
 if [ $(($non_validator_count)) -ne 0 ]; then
-    go run . -debug -seed 1234 -port 61960 -nodeType nonvalidators -duration $duration
+    go run . -debug -seed 1234 -port 61960 -nodeType nonvalidators -duration $exp_duration
 fi;
 
 mkdir "${result_dir}/${experiment_name}_${finish_time}}"
