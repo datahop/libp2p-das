@@ -18,10 +18,10 @@ result_dir="/home/${login}/results"
 finish_time=$(date +%d-%m-%y-%H-%M)
 result_dir="$result_dir/$experiment_name_$finish_time"
 
-echo "result dir: $result_dir"
+rm -rf oar*
+rm -rf OAR*
 
 if [ ! -d "$result_dir" ]; then
-    echo "Creating result directory: $result_dir"
     mkdir -p "$result_dir"
 fi
 
@@ -36,6 +36,10 @@ echo "Installing libp2p-das-datahop"
 #Build and run experiment
 git clone https://github.com/Blitz3r123/libp2p-das-datahop.git
 cd libp2p-das-datahop
+
+sudo-g5k systemctl start sysstat
+sar -A -o sar_logs 1 $exp_duration >/dev/null 2>&1 &
+sleep 1
 
 echo "Running builders"
 # Run builders
@@ -57,9 +61,9 @@ done
 
 if [ $(($non_validator_count)) -eq 0 ]
 then
-    go run . -debug -seed 1234 -port 61960 -nodeType validator -duration $exp_duration
+    go run . -debug -duration $exp_duration -nodeType validator -peer /ip4/127.0.0.1/tcp/61960/p2p/12D3KooWE3AwZFT9zEWDUxhya62hmvEbRxYBWaosn7Kiqw5wsu73
 else
-    go run . -debug -seed 1234 -port 61960 -nodeType validator -duration $exp_duration &
+    go run . -debug -duration $exp_duration -nodeType validator -peer /ip4/127.0.0.1/tcp/61960/p2p/12D3KooWE3AwZFT9zEWDUxhya62hmvEbRxYBWaosn7Kiqw5wsu73 &
 fi
 
 echo "Running non-validators"
@@ -72,8 +76,8 @@ do
 done
 
 if [ $(($non_validator_count)) -ne 0 ]; then
-    go run . -debug -seed 1234 -port 61960 -nodeType nonvalidators -duration $exp_duration
+    go run . -debug -duration $exp_duration -nodeType nonvalidator -peer /ip4/127.0.0.1/tcp/61960/p2p/12D3KooWE3AwZFT9zEWDUxhya62hmvEbRxYBWaosn7Kiqw5wsu73
 fi;
 
-mkdir "${result_dir}/${experiment_name}_${finish_time}}"
 cp *.csv "${result_dir}/${experiment_name}_${finish_time}}"
+cp sar_logs "${result_dir}/${experiment_name}_${finish_time}"
