@@ -155,43 +155,42 @@ def main(output_dir):
     print("Begin at: ",start)
     print("Expected to finish at: ",add_time(start,h,m,s + 10))
     
-    for i in track(exp_duration + 20, description="Waiting for experiment to finish..."):
+    for i in track(range(exp_duration + 20), description="Waiting for experiment to finish..."):
         time.sleep(1)
 
 
-    results_dir = f"/home/{login}/results/"
-        # Download experiment results
-    current_dirs = [f for f in os.listdir(output_dir) if os.path.isdir(os.path.join(output_dir, f))]
+    if output_dir != None:
+        """
+        1. Get all folders in remote results folder
+        2. Get all folders in local folder
+        3. Find the ones that are remote and not in local folder
+        4. Download them
+        5. Remove them from remote folder
+        """
 
-    """
-    1. Get all folders in remote results folder
-    2. Get all folders in local folder
-    3. Find the ones that are remote and not in local folder
-    4. Download them
-    5. Remove them from remote folder
-    """
+        results_dir = f"/results"
 
-    # Get all folders in remote results folder
-    remote_folders = f"ssh {login}@access.grid5000.fr:{site} ls {results_dir}"
-    remote_folders = subprocess.run(remote_folders, shell=True, stdout=subprocess.PIPE).stdout.decode("utf-8").split("\n")
-    remote_folders = [folder for folder in remote_folders if folder != ""]
-    
-    # Get all folders in local folder
-    local_folders = [f for f in os.listdir(output_dir) if os.path.isdir(os.path.join(output_dir, f))]
-    
-    # Find the ones that are remote and not in local folder
-    folders_to_download = [folder for folder in remote_folders if folder not in local_folders]
-    
-    # Download them
-    for folder in folders_to_download:
-        remote_path = os.path.join(results_dir, folder)
-        local_path = os.path.join(output_dir, folder)
-        subprocess.run(["scp", "-r", "-C", f"{login}@access.grid5000.fr:{remote_path}", local_path])
-    
-    # Remove them from remote folder
-    for folder in folders_to_download:
-        remote_path = os.path.join(results_dir, folder)
-        subprocess.run(["ssh", f"{login}@access.grid5000.fr", f"rm -rf {remote_path}"])
+        # Get all folders in remote results folder
+        remote_folders = f"ssh {login}@access.grid5000.fr ls {site}{results_dir}"
+        remote_folders = subprocess.run(remote_folders, shell=True, stdout=subprocess.PIPE).stdout.decode("utf-8").split("\n")
+        remote_folders = [folder for folder in remote_folders if folder != ""]
+        
+        # Get all folders in local folder
+        local_folders = [f for f in os.listdir(output_dir) if os.path.isdir(os.path.join(output_dir, f))]
+        
+        # Find the ones that are remote and not in local folder
+        folders_to_download = [folder for folder in remote_folders if folder not in local_folders]
+        
+        # Download them
+        for folder in folders_to_download:
+            remote_path = os.path.join(results_dir, folder)
+            local_path = os.path.join(output_dir, folder)
+            subprocess.run(["scp", "-r", "-C", f"{login}@access.grid5000.fr:{site}{remote_path}", local_path])
+        
+        # Remove them from remote folder
+        for folder in folders_to_download:
+            remote_path = os.path.join(results_dir, folder)
+            subprocess.run(["ssh", f"{login}@access.grid5000.fr", f"rm -rf {site}{remote_path}"])
 
     #Release all Grid'5000 resources
     netem.destroy()
