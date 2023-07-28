@@ -41,7 +41,6 @@ sudo-g5k systemctl start sysstat
 sar -A -o sar_logs 1 $exp_duration >/dev/null 2>&1 &
 sleep 1
 
-echo "Running builders"
 # Run builders
 for ((i=0; i<$builder_count-1; i++))
 do
@@ -52,9 +51,9 @@ done
 
 if [ $(($builder_count)) -ne 0 ] && [ $(($non_validator_count)) -eq 0 ] && [ $(($validator_count)) -eq 0 ]; then
     go run . -debug -seed 1234 -port 61960 -nodeType builder -duration $exp_duration
+    sleep 0.01
 fi;
 
-echo "Running validators"
 # Run validators
 for ((i=0; i<$validator_count - 1; i++))
 do
@@ -72,7 +71,6 @@ else
     go run . -debug -duration $exp_duration -nodeType validator -peer /ip4/127.0.0.1/tcp/61960/p2p/12D3KooWE3AwZFT9zEWDUxhya62hmvEbRxYBWaosn7Kiqw5wsu73 &
 fi
 
-echo "Running non-validators"
 # Run non validators
 for ((i=0; i<$non_validator_count - 1; i++))
 do
