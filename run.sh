@@ -81,3 +81,4 @@ fi;
 
 cp *.csv "$result_dir"
 cp sar_logs "$result_dir"
+sleep 1
