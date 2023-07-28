@@ -15,7 +15,7 @@ non_validator_count=$5
 login=$6
 
 result_dir="/home/${login}/results/"
-finish_time=$(date + %d-%m-%y-%H-%M)
+finish_time=$(date +%d-%m-%y-%H-%M)
 result_dir="${result_dir}/${experiment_name}_${finish_time}"
 
 rm -rf oar*
