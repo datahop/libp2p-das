@@ -4,15 +4,17 @@ import os
 import datetime
 import subprocess
 import time
-#Upload launch script to site frontend
-def execute_ssh_command(launch_script, login, site):
-    # SSH command in the format 'ssh <username>@<hostname> "<command>"'
-    ssh_command = f'scp {launch_script} {login}@access.grid5000.fr:{site}'
+import sys
+from rich.console import Console
+from rich.progress import track
 
+console = Console()
+
+#Upload launch script to site frontend
+def execute_ssh_command(ssh_command, login, site):
     try:
         # Execute the SSH command
         result = subprocess.run(ssh_command, shell=True, capture_output=True, text=True)
-        print("Script send to frontend")
         # Check if the command was successful
         if result.returncode == 0:
             # Print the output
@@ -61,8 +63,7 @@ def node_partition(nb_cluster_machine, nb_builder, nb_validator, nb_regular):
         index += 1
     return partition
  
-def main():
-
+def main(output_dir):
     #========== Parameters ==========
     #Grid5000 parameters
     login = "kpeeroo" #Grid5000 login
@@ -135,10 +136,10 @@ def main():
     netem.deploy()
     netem.validate()
 
-
     #========== Deploy Experiment ==========
     #Send launch script to Grid5000 site frontend
-    execute_ssh_command(launch_script, login, site)
+    ssh_command = f'scp {launch_script} {login}@access.grid5000.fr:{site}'
+    execute_ssh_command(ssh_command, login, site)
     i = 0
     for x in roles["experiment"]:
         with en.actions(roles=x, on_error_continue=True, background=True) as p:
@@ -153,11 +154,55 @@ def main():
     h,m,s = convert_seconds_to_time(exp_duration)
     print("Begin at: ",start)
     print("Expected to finish at: ",add_time(start,h,m,s + 10))
-    time.sleep(exp_duration + 20)
+    
+    for i in track(exp_duration + 20, description="Waiting for experiment to finish..."):
+        time.sleep(1)
+
+
+    results_dir = f"/home/{login}/results/"
+        # Download experiment results
+    current_dirs = [f for f in os.listdir(output_dir) if os.path.isdir(os.path.join(output_dir, f))]
+
+    """
+    1. Get all folders in remote results folder
+    2. Get all folders in local folder
+    3. Find the ones that are remote and not in local folder
+    4. Download them
+    5. Remove them from remote folder
+    """
+
+    # Get all folders in remote results folder
+    remote_folders = f"ssh {login}@access.grid5000.fr:{site} ls {results_dir}"
+    remote_folders = subprocess.run(remote_folders, shell=True, stdout=subprocess.PIPE).stdout.decode("utf-8").split("\n")
+    remote_folders = [folder for folder in remote_folders if folder != ""]
+    
+    # Get all folders in local folder
+    local_folders = [f for f in os.listdir(output_dir) if os.path.isdir(os.path.join(output_dir, f))]
+    
+    # Find the ones that are remote and not in local folder
+    folders_to_download = [folder for folder in remote_folders if folder not in local_folders]
+    
+    # Download them
+    for folder in folders_to_download:
+        remote_path = os.path.join(results_dir, folder)
+        local_path = os.path.join(output_dir, folder)
+        subprocess.run(["scp", "-r", "-C", f"{login}@access.grid5000.fr:{remote_path}", local_path])
+    
+    # Remove them from remote folder
+    for folder in folders_to_download:
+        remote_path = os.path.join(results_dir, folder)
+        subprocess.run(["ssh", f"{login}@access.grid5000.fr", f"rm -rf {remote_path}"])
 
     #Release all Grid'5000 resources
     netem.destroy()
     provider.destroy()
 
 if __name__ == "__main__":
-    main()
+    # Check if argument is sent in and is a valid dir path
+    if len(sys.argv) > 1:
+        dir_path = sys.argv[1]
+        if not os.path.isdir(dir_path):
+            console.print(f"{dir_path} is an invalid directory path", style="bold red")
+            main()
+        else:
+            main(dir_path)
