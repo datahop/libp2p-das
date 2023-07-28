@@ -14,7 +14,7 @@ validator_count=$4
 non_validator_count=$5
 login=$6
 
-result_dir="/home/${login}/results/"
+result_dir="/home/${login}/results"
 finish_time=$(date +%d-%m-%y-%H-%M)
 result_dir="${result_dir}/${experiment_name}_${finish_time}"
 
@@ -43,16 +43,20 @@ sleep 1
 
 echo "Running builders"
 # Run builders
-for ((i=1; i<=$builder_count; i++))
+for ((i=0; i<$builder_count-1; i++))
 do
     echo "Running builder $i"
     go run . -debug -seed 1234 -port 61960 -nodeType builder -duration $exp_duration &
     sleep 0.01
 done
 
+if [ $(($builder_count)) -ne 0 ] && [ $(($non_validator_count)) -eq 0 ] && [ $(($validator_count)) -eq 0 ]; then
+    go run . -debug -seed 1234 -port 61960 -nodeType builder -duration $exp_duration
+fi;
+
 echo "Running validators"
 # Run validators
-for ((i=0; i<=$validator_count - 1; i++))
+for ((i=0; i<$validator_count - 1; i++))
 do
     echo "Running validator $i"
     go run . -debug -duration $exp_duration -nodeType validator -peer /ip4/127.0.0.1/tcp/61960/p2p/12D3KooWE3AwZFT9zEWDUxhya62hmvEbRxYBWaosn7Kiqw5wsu73 &
@@ -61,14 +65,16 @@ done
 
 if [ $(($non_validator_count)) -eq 0 ]
 then
-    go run . -debug -duration $exp_duration -nodeType validator -peer /ip4/127.0.0.1/tcp/61960/p2p/12D3KooWE3AwZFT9zEWDUxhya62hmvEbRxYBWaosn7Kiqw5wsu73
+    if [ $(($validator_count)) -ne 0 ]; then
+        go run . -debug -duration $exp_duration -nodeType validator -peer /ip4/127.0.0.1/tcp/61960/p2p/12D3KooWE3AwZFT9zEWDUxhya62hmvEbRxYBWaosn7Kiqw5wsu73
+    fi;
 else
     go run . -debug -duration $exp_duration -nodeType validator -peer /ip4/127.0.0.1/tcp/61960/p2p/12D3KooWE3AwZFT9zEWDUxhya62hmvEbRxYBWaosn7Kiqw5wsu73 &
 fi
 
 echo "Running non-validators"
 # Run non validators
-for ((i=0; i<=$non_validator_count - 1; i++))
+for ((i=0; i<$non_validator_count - 1; i++))
 do
     echo "Running non validator $i"
     go run . -debug -duration $exp_duration -nodeType nonvalidator -peer /ip4/127.0.0.1/tcp/61960/p2p/12D3KooWE3AwZFT9zEWDUxhya62hmvEbRxYBWaosn7Kiqw5wsu73 &
