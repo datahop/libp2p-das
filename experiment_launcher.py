@@ -117,24 +117,23 @@ def main(output_dir):
     roles, networks = provider.init(force_deploy=True)
     roles = en.sync_info(roles, networks)
 
-
-    #========== Grid5000 network emulation configuration ==========
-    #network parameters
-    netem = en.NetemHTB()
-    (
-        netem.add_constraints(
-            src=roles["experiment"],
-            dest=roles["experiment"],
-            delay=delay,
-            rate=rate,
-            loss=loss,
-            symmetric=symmetric,
-        )
-    )
+    # #========== Grid5000 network emulation configuration ==========
+    # #network parameters
+    # netem = en.NetemHTB()
+    # (
+    #     netem.add_constraints(
+    #         src=roles["experiment"],
+    #         dest=roles["experiment"],
+    #         delay=delay,
+    #         rate=rate,
+    #         loss=loss,
+    #         symmetric=symmetric,
+    #     )
+    # )
     
-    #Deploy network emulation
-    netem.deploy()
-    netem.validate()
+    # #Deploy network emulation
+    # netem.deploy()
+    # netem.validate()
 
     #========== Deploy Experiment ==========
     #Send launch script to Grid5000 site frontend
@@ -157,7 +156,6 @@ def main(output_dir):
     
     for i in track(range(exp_duration + 20), description="Waiting for experiment to finish..."):
         time.sleep(1)
-
 
     if output_dir != None:
         """
@@ -185,7 +183,7 @@ def main(output_dir):
         for folder in folders_to_download:
             remote_path = os.path.join(results_dir, folder)
             local_path = os.path.join(output_dir, folder)
-            subprocess.run(["scp", "-r", "-C", f"{login}@access.grid5000.fr:{site}{remote_path}", local_path])
+            subprocess.run(f"scp -rC {login}@access.grid5000.fr:{site}{remote_path} {local_path}")
         
         # Remove them from remote folder
         for folder in folders_to_download:
@@ -193,7 +191,7 @@ def main(output_dir):
             subprocess.run(["ssh", f"{login}@access.grid5000.fr", f"rm -rf {site}{remote_path}"])
 
     #Release all Grid'5000 resources
-    netem.destroy()
+    # netem.destroy()
     provider.destroy()
 
 if __name__ == "__main__":
@@ -202,6 +200,8 @@ if __name__ == "__main__":
         dir_path = sys.argv[1]
         if not os.path.isdir(dir_path):
             console.print(f"{dir_path} is an invalid directory path", style="bold red")
-            main()
+            main(None)
         else:
             main(dir_path)
+    else:
+        main(None)

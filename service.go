@@ -54,7 +54,6 @@ func (s *Service) StartMessaging(dht *dht.IpfsDHT, stats *Stats, peerType string
 
 	// ? Generate 512 x 512 IDs for each sample
 	sampleIDs := make([]int, TotalSamplesCount)
-
 	for i := 0; i < TotalSamplesCount; i++ {
 		sampleIDs[i] = i
 	}
@@ -117,8 +116,8 @@ func (s *Service) StartMessaging(dht *dht.IpfsDHT, stats *Stats, peerType string
 				putErr := dht.PutValue(ctx, "/das/sample/"+fmt.Sprint(blockID)+"/"+fmt.Sprint(sampleID), sample)
 
 				if putErr != nil {
-					log.Print("[BUILDER\t" + s.host.ID()[0:5].Pretty() + "] PutValue() Error: " + putErr.Error())
-					log.Printf("[BUILDER\t"+s.host.ID()[0:5].Pretty()+"]: DHT Peers: %d\n", len(dht.RoutingTable().ListPeers()))
+					log.Print("[BUILDER\t\t" + s.host.ID()[0:5].Pretty() + "] PutValue() Error: " + putErr.Error())
+					log.Printf("[BUILDER\t\t"+s.host.ID()[0:5].Pretty()+"]: DHT Peers: %d\n", len(dht.RoutingTable().ListPeers()))
 					stats.TotalFailedPuts += 1
 					stats.PutLatencies = append(stats.PutLatencies, time.Since(startTime))
 				} else {
@@ -139,7 +138,7 @@ func (s *Service) StartMessaging(dht *dht.IpfsDHT, stats *Stats, peerType string
 					stats.GetLatencies = append(stats.GetLatencies, time.Since(startTime))
 					stats.GetHops = append(stats.GetHops, hops)
 				} else {
-					log.Print("[VALIDATOR\t" + s.host.ID()[0:5].Pretty() + "] " + colorize("GET", "blue") + " sample (" + fmt.Sprint(blockID) + ", " + fmt.Sprint(randomSampleID) + ") from DHT.\n")
+					log.Print("[VALIDATOR\t\t" + s.host.ID()[0:5].Pretty() + "] " + colorize("GET", "blue") + " sample (" + fmt.Sprint(blockID) + ", " + fmt.Sprint(randomSampleID) + ") from DHT.\n")
 					stats.TotalGetMessages += 1
 					stats.GetLatencies = append(stats.GetLatencies, time.Since(startTime))
 					stats.GetHops = append(stats.GetHops, hops)
