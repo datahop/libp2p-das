@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"math/rand"
+	"strconv"
 	"time"
 
 	dht "github.com/Blitz3r123/go-libp2p-kad-dht"
@@ -20,6 +21,12 @@ type Service struct {
 	rpcClient *rpc.Client
 	host      host.Host
 	protocol  protocol.ID
+}
+
+type Parcel struct {
+	StartingIndex int
+	IsRow         bool
+	SampleCount   int
 }
 
 func NewService(host host.Host, protocol protocol.ID) *Service {
@@ -42,15 +49,60 @@ func (s *Service) SetupRPC() error {
 	return nil
 }
 
+func SplitSamplesIntoParcels(RowCount, ParcelSize int) []Parcel {
+	TotalSamplesCount := RowCount * RowCount
+	parcels := make([]Parcel, 0)
+
+	// Split the samples into row parcels
+	for i := 0; i < TotalSamplesCount; i += ParcelSize {
+		parcel := Parcel{
+			StartingIndex: i,
+			SampleCount:   ParcelSize,
+			IsRow:         true,
+		}
+		parcels = append(parcels, parcel)
+	}
+
+	// Split the samples into column parcels
+	rowID := 0
+	colID := 0
+	for colID < RowCount {
+		for i := 0; i < ParcelSize; i++ {
+			parcelID := rowID*RowCount + colID
+			parcel := Parcel{
+				StartingIndex: parcelID,
+				SampleCount:   ParcelSize,
+				IsRow:         false,
+			}
+			if i == 0 {
+				parcels = append(parcels, parcel)
+			}
+
+			rowID++
+
+			if rowID >= RowCount {
+				rowID = 0
+				colID++
+			}
+		}
+	}
+
+	return parcels
+}
+
 func (s *Service) StartMessaging(dht *dht.IpfsDHT, stats *Stats, peerType string, ctx context.Context) {
 	ticker := time.NewTicker(time.Millisecond * 500)
 	defer ticker.Stop()
 
-	// const TotalSamplesCount = 512 * 512
-	const TotalSamplesCount = 10
+	const RowCount = 4
+	const TotalSamplesCount = RowCount * RowCount
 	const TotalBlocksCount = 10
-
+	const ParcelSize = 2
 	blockID := 0
+	currentBlockID := 0
+
+	// var sample []byte = make([]byte, 512)
+	var samplesReceived []int
 
 	// ? Generate 512 x 512 IDs for each sample
 	sampleIDs := make([]int, TotalSamplesCount)
@@ -58,11 +110,9 @@ func (s *Service) StartMessaging(dht *dht.IpfsDHT, stats *Stats, peerType string
 		sampleIDs[i] = i
 	}
 
-	var sample []byte = make([]byte, 512)
-
-	currentBlockID := 0
-	// ? x = blockID, y = sampleID
-	var samplesReceived []int
+	parcels := SplitSamplesIntoParcels(RowCount, ParcelSize)
+	var parcelsSent []Parcel
+	// var parcelsReceived []Parcel
 
 	for {
 		select {
@@ -72,27 +122,32 @@ func (s *Service) StartMessaging(dht *dht.IpfsDHT, stats *Stats, peerType string
 
 			if peerType == "builder" {
 
-				if len(sampleIDs) == 0 && blockID < TotalBlocksCount {
+				// ? If all parcels are sent, go to the next block
+				if len(parcelsSent) == len(parcels) && blockID < TotalBlocksCount {
 					blockID += 1
-					sampleIDs = make([]int, TotalSamplesCount)
-					for i := 0; i < TotalSamplesCount; i++ {
-						sampleIDs[i] = i
+					parcelsSent = make([]Parcel, 0)
+				}
+
+				// ? If all blocks are sent, stop
+				if blockID >= TotalBlocksCount {
+					fmt.Println("All blocks sent.")
+					continue
+				}
+
+				// ? Pick a random parcel that has not been sent yet
+				parcelID := rand.Intn(len(parcels))
+				for _, p := range parcelsSent {
+					// ? If the parcel ID and type are the same, pick another parcel
+					if p.StartingIndex == parcels[parcelID].StartingIndex && p.IsRow == parcels[parcelID].IsRow {
+						continue
 					}
 				}
 
-				// ? Get random sampleID
-				sampleID := rand.Intn(TotalSamplesCount)
-				// ? Remove the sampleID from the sampleIDs
-				for i, id := range sampleIDs {
-					if id == sampleID {
-						sampleIDs = append(sampleIDs[:i], sampleIDs[i+1:]...)
-						break
-					}
-				}
-				// ? Decrease the length of the sampleIDs by 1
-				if len(sampleIDs) > 0 {
-					sampleIDs = sampleIDs[:len(sampleIDs)-1]
-				}
+				// ? Get the parcel
+				parcelToSend := parcels[parcelID]
+
+				// ? Get the samples
+				parcelSamplesToSend := make([]byte, parcelToSend.SampleCount)
 
 				peers := FilterSelf(s.host.Peerstore().Peers(), s.host.ID())
 				dhtPeers := FilterSelf(dht.RoutingTable().ListPeers(), s.host.ID())
@@ -112,8 +167,8 @@ func (s *Service) StartMessaging(dht *dht.IpfsDHT, stats *Stats, peerType string
 
 				startTime := time.Now()
 
-				// ? Put sample into DHT
-				putErr := dht.PutValue(ctx, "/das/sample/"+fmt.Sprint(blockID)+"/"+fmt.Sprint(sampleID), sample)
+				// ? Put parcel samples into DHT
+				putErr := dht.PutValue(ctx, "/das/sample/"+fmt.Sprint(blockID)+"/"+fmt.Sprint(parcelToSend.StartingIndex), parcelSamplesToSend)
 
 				if putErr != nil {
 					log.Print("[BUILDER\t\t" + s.host.ID()[0:5].Pretty() + "] PutValue() Error: " + putErr.Error())
@@ -121,7 +176,25 @@ func (s *Service) StartMessaging(dht *dht.IpfsDHT, stats *Stats, peerType string
 					stats.TotalFailedPuts += 1
 					stats.PutLatencies = append(stats.PutLatencies, time.Since(startTime))
 				} else {
-					log.Print("[BUILDER\t" + s.host.ID()[0:5].Pretty() + "] " + colorize("PUT", "green") + " sample (" + fmt.Sprint(blockID) + ", " + fmt.Sprint(sampleID) + ") into DHT.\n")
+					parcelsSent = append(parcelsSent, parcelToSend)
+
+					parcelTypeString := colorize("COL", "green")
+					lastParcelID := parcelToSend.StartingIndex + (parcelToSend.SampleCount-1)*RowCount
+					if parcelToSend.IsRow {
+						parcelTypeString = colorize("ROW", "blue")
+						lastParcelID = parcelToSend.StartingIndex + (parcelToSend.SampleCount - 1)
+					}
+
+					builderIdString := "[BUILDER\t" + s.host.ID()[0:5].Pretty() + "]"
+					blockIDString := fmt.Sprint(blockID)
+
+					parcelContentsString := "[" + strconv.Itoa(parcelToSend.StartingIndex) + "..." + strconv.Itoa(lastParcelID) + "]"
+					if parcelToSend.SampleCount <= 2 {
+						parcelContentsString = "[" + strconv.Itoa(parcelToSend.StartingIndex) + ", " + strconv.Itoa(lastParcelID) + "]"
+					}
+
+					log.Print(builderIdString + " PUT " + parcelTypeString + " parcel BID " + blockIDString + " into DHT:\t" + parcelContentsString + "\n")
+
 					stats.TotalPutMessages += 1
 					stats.PutLatencies = append(stats.PutLatencies, time.Since(startTime))
 				}

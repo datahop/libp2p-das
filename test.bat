@@ -1,5 +1,7 @@
 @echo off
 
+del *.csv
+
 set duration=%1
 set builderCount=%2
 set validatorCount=%3
