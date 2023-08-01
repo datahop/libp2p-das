@@ -198,8 +198,8 @@ func (s *Service) StartMessaging(dht *dht.IpfsDHT, stats *Stats, peerType string
 				// ? Get the parcel
 				parcelToSend := parcels[parcelID]
 
-				// ? Get the samples
-				parcelSamplesToSend := make([]byte, parcelToSend.SampleCount)
+				// ? Get the samples - 512 bytes per sample
+				parcelSamplesToSend := make([]byte, parcelToSend.SampleCount*512)
 
 				peers := FilterSelf(s.host.Peerstore().Peers(), s.host.ID())
 				dhtPeers := FilterSelf(dht.RoutingTable().ListPeers(), s.host.ID())
