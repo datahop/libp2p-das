@@ -90,6 +90,43 @@ func SplitSamplesIntoParcels(RowCount, ParcelSize int) []Parcel {
 	return parcels
 }
 
+func printOperation(peerIdString string, isPut bool, showParcelStatusFraction bool, parcelInvolved Parcel, blockID int, RowCount int, parcelsReceivedCount int, totalParcelsNeededCount int, randomSampleID int) string {
+
+	output := peerIdString
+
+	if showParcelStatusFraction {
+		output += " (" + strconv.Itoa(parcelsReceivedCount) + "/" + strconv.Itoa(totalParcelsNeededCount) + ")"
+	}
+
+	if isPut {
+		output += " PUT "
+	} else {
+		output += " GET "
+	}
+
+	parcelTypeString := colorize("COL", "green")
+	lastParcelID := parcelInvolved.StartingIndex + (parcelInvolved.SampleCount-1)*RowCount
+	if parcelInvolved.IsRow {
+		parcelTypeString = colorize("ROW", "blue")
+		lastParcelID = parcelInvolved.StartingIndex + (parcelInvolved.SampleCount - 1)
+	}
+
+	blockIDString := strconv.Itoa(blockID)
+
+	parcelContentsString := "[" + strconv.Itoa(parcelInvolved.StartingIndex) + "..." + strconv.Itoa(lastParcelID) + "]"
+	if parcelInvolved.SampleCount <= 2 {
+		parcelContentsString = "[" + strconv.Itoa(parcelInvolved.StartingIndex) + ", " + strconv.Itoa(lastParcelID) + "]"
+	}
+
+	if randomSampleID != -1 {
+		output += parcelTypeString + " parcel BID " + blockIDString + " SID " + strconv.Itoa(randomSampleID) + ": " + parcelContentsString
+	} else {
+		output += parcelTypeString + " parcel BID " + blockIDString + ": " + parcelContentsString
+	}
+
+	return output
+}
+
 func (s *Service) StartMessaging(dht *dht.IpfsDHT, stats *Stats, peerType string, ctx context.Context) {
 	ticker := time.NewTicker(time.Millisecond * 500)
 	defer ticker.Stop()
@@ -101,9 +138,7 @@ func (s *Service) StartMessaging(dht *dht.IpfsDHT, stats *Stats, peerType string
 	blockID := 0
 	currentBlockID := 0
 
-	// var sample []byte = make([]byte, 512)
-
-	// ? Generate 512 x 512 IDs for each sample
+	// ? Generate 512 x 512 IDs for each sample starting from 0 to 512^2-1
 	sampleIDs := make([]int, TotalSamplesCount)
 	for i := 0; i < TotalSamplesCount; i++ {
 		sampleIDs[i] = i
@@ -113,7 +148,7 @@ func (s *Service) StartMessaging(dht *dht.IpfsDHT, stats *Stats, peerType string
 	var parcelsSent []Parcel
 	var parcelsReceived []Parcel
 
-	// ! Validator
+	// ! Validator Variables:
 
 	// ? Find out how many parcels are needed to make up at least half the row
 	halfRowCount := RowCount / 2
@@ -131,14 +166,6 @@ func (s *Service) StartMessaging(dht *dht.IpfsDHT, stats *Stats, peerType string
 
 	totalParcelsNeededCount := rowParcelsNeededCount + colParcelsNeededCount + randomParcelsNeededCount
 
-	// fmt.Println("RowCount:", RowCount)
-	// fmt.Println("halfRowCount:", halfRowCount)
-	// fmt.Println("rowParcelsNeededCount:", rowParcelsNeededCount)
-	// fmt.Println("colParcelsNeededCount:", colParcelsNeededCount)
-	// fmt.Println("randomParcelsNeededCount:", randomParcelsNeededCount)
-	// fmt.Println("totalParcelsNeededCount:", totalParcelsNeededCount)
-	// fmt.Println()
-
 	for {
 		select {
 		case <-ctx.Done():
@@ -155,7 +182,7 @@ func (s *Service) StartMessaging(dht *dht.IpfsDHT, stats *Stats, peerType string
 
 				// ? If all blocks are sent, stop
 				if blockID >= TotalBlocksCount {
-					fmt.Println("All blocks sent.")
+					log.Println("All blocks sent from builder.")
 					continue
 				}
 
@@ -177,10 +204,12 @@ func (s *Service) StartMessaging(dht *dht.IpfsDHT, stats *Stats, peerType string
 				peers := FilterSelf(s.host.Peerstore().Peers(), s.host.ID())
 				dhtPeers := FilterSelf(dht.RoutingTable().ListPeers(), s.host.ID())
 
+				// ? No peers found, skip
 				if len(peers) == 0 && len(dhtPeers) == 0 {
 					continue
 				}
 
+				// ? Manually add peers to routing table
 				if len(peers) == 0 || len(dhtPeers) == 0 {
 					for _, p := range peers {
 						_, err := dht.RoutingTable().TryAddPeer(p, false, true)
@@ -196,32 +225,32 @@ func (s *Service) StartMessaging(dht *dht.IpfsDHT, stats *Stats, peerType string
 				putErr := dht.PutValue(ctx, "/das/sample/"+fmt.Sprint(blockID)+"/"+fmt.Sprint(parcelToSend.StartingIndex), parcelSamplesToSend)
 
 				if putErr != nil {
-					log.Print("[BUILDER\t\t" + s.host.ID()[0:5].Pretty() + "] PutValue() Error: " + putErr.Error())
-					log.Printf("[BUILDER\t\t"+s.host.ID()[0:5].Pretty()+"]: DHT Peers: %d\n", len(dht.RoutingTable().ListPeers()))
 					stats.TotalFailedPuts += 1
 					stats.PutLatencies = append(stats.PutLatencies, time.Since(startTime))
+
+					log.Print("[BUILDER\t\t" + s.host.ID()[0:5].Pretty() + "] PutValue() Error: " + putErr.Error())
+					log.Printf("[BUILDER\t\t"+s.host.ID()[0:5].Pretty()+"]: DHT Peers: %d\n", len(dht.RoutingTable().ListPeers()))
+
 				} else {
-					parcelsSent = append(parcelsSent, parcelToSend)
-
-					parcelTypeString := colorize("COL", "green")
-					lastParcelID := parcelToSend.StartingIndex + (parcelToSend.SampleCount-1)*RowCount
-					if parcelToSend.IsRow {
-						parcelTypeString = colorize("ROW", "blue")
-						lastParcelID = parcelToSend.StartingIndex + (parcelToSend.SampleCount - 1)
-					}
-
-					builderIdString := "[BUILDER\t" + s.host.ID()[0:5].Pretty() + "]"
-					blockIDString := fmt.Sprint(currentBlockID)
-
-					parcelContentsString := "[" + strconv.Itoa(parcelToSend.StartingIndex) + "..." + strconv.Itoa(lastParcelID) + "]"
-					if parcelToSend.SampleCount <= 2 {
-						parcelContentsString = "[" + strconv.Itoa(parcelToSend.StartingIndex) + ", " + strconv.Itoa(lastParcelID) + "]"
-					}
-
-					log.Print(builderIdString + " PUT " + parcelTypeString + " parcel BID " + blockIDString + " into DHT:\t" + parcelContentsString + "\n")
-
 					stats.TotalPutMessages += 1
 					stats.PutLatencies = append(stats.PutLatencies, time.Since(startTime))
+
+					parcelsSent = append(parcelsSent, parcelToSend)
+
+					log.Print(
+						printOperation(
+							"[BUILDER\t"+s.host.ID()[0:5].Pretty()+"]",
+							true,
+							false,
+							parcelToSend,
+							currentBlockID,
+							RowCount,
+							0,
+							0,
+							-1,
+						),
+					)
+
 				}
 
 			} else if peerType == "validator" {
@@ -270,7 +299,6 @@ func (s *Service) StartMessaging(dht *dht.IpfsDHT, stats *Stats, peerType string
 					startTime := time.Now()
 					_, hops, err := dht.GetValueHops(ctx, "/das/sample/"+fmt.Sprint(currentBlockID)+"/"+fmt.Sprint(parcelToGet.StartingIndex))
 					if err != nil {
-						// log.Print("[VALIDATOR\t" + s.host.ID()[0:5].Pretty() + "] GetValue(/das/sample/" + fmt.Sprint(currentBlockID) + "/" + fmt.Sprint(randomSampleID) + ") Error: " + err.Error())
 						stats.TotalFailedGets += 1
 						stats.TotalGetMessages += 1
 						stats.GetLatencies = append(stats.GetLatencies, time.Since(startTime))
@@ -281,23 +309,20 @@ func (s *Service) StartMessaging(dht *dht.IpfsDHT, stats *Stats, peerType string
 						stats.GetHops = append(stats.GetHops, hops)
 
 						parcelsReceived = append(parcelsReceived, parcelToGet)
-						parcelTypeString := colorize("COL", "green")
-						lastParcelID := parcelToGet.StartingIndex + (parcelToGet.SampleCount-1)*RowCount
-						if parcelToGet.IsRow {
-							parcelTypeString = colorize("ROW", "blue")
-							lastParcelID = parcelToGet.StartingIndex + (parcelToGet.SampleCount - 1)
-						}
 
-						validatorIdString := "[VALIDATOR\t" + s.host.ID()[0:5].Pretty() + "]"
-						parcelCountStatusString := "(" + strconv.Itoa(len(parcelsReceived)) + "/" + strconv.Itoa(totalParcelsNeededCount) + ")"
-						blockIDString := fmt.Sprint(currentBlockID)
-
-						parcelContentsString := "[" + strconv.Itoa(parcelToGet.StartingIndex) + "..." + strconv.Itoa(lastParcelID) + "]"
-						if parcelToGet.SampleCount <= 2 {
-							parcelContentsString = "[" + strconv.Itoa(parcelToGet.StartingIndex) + ", " + strconv.Itoa(lastParcelID) + "]"
-						}
-
-						log.Print(validatorIdString + " " + parcelCountStatusString + " GET " + parcelTypeString + " parcel BID " + blockIDString + " from DHT:\t" + parcelContentsString + "\n")
+						log.Print(
+							printOperation(
+								"[VALIDATOR\t"+s.host.ID()[0:5].Pretty()+"]",
+								false,
+								true,
+								parcelToGet,
+								currentBlockID,
+								RowCount,
+								len(parcelsReceived),
+								totalParcelsNeededCount,
+								-1,
+							),
+						)
 					}
 				}
 
@@ -319,34 +344,30 @@ func (s *Service) StartMessaging(dht *dht.IpfsDHT, stats *Stats, peerType string
 					startTime := time.Now()
 					_, hops, err := dht.GetValueHops(ctx, "/das/sample/"+fmt.Sprint(currentBlockID)+"/"+fmt.Sprint(parcelToGet.StartingIndex))
 					if err != nil {
-						// log.Print("[VALIDATOR\t" + s.host.ID()[0:5].Pretty() + "] GetValue(/das/sample/" + fmt.Sprint(currentBlockID) + "/" + fmt.Sprint(randomSampleID) + ") Error: " + err.Error())
+						stats.GetLatencies = append(stats.GetLatencies, time.Since(startTime))
 						stats.TotalFailedGets += 1
 						stats.TotalGetMessages += 1
-						stats.GetLatencies = append(stats.GetLatencies, time.Since(startTime))
 						stats.GetHops = append(stats.GetHops, hops)
 					} else {
-						stats.TotalGetMessages += 1
 						stats.GetLatencies = append(stats.GetLatencies, time.Since(startTime))
+						stats.TotalGetMessages += 1
 						stats.GetHops = append(stats.GetHops, hops)
 
 						parcelsReceived = append(parcelsReceived, parcelToGet)
-						parcelTypeString := colorize("COL", "green")
-						lastParcelID := parcelToGet.StartingIndex + (parcelToGet.SampleCount-1)*RowCount
-						if parcelToGet.IsRow {
-							parcelTypeString = colorize("ROW", "blue")
-							lastParcelID = parcelToGet.StartingIndex + (parcelToGet.SampleCount - 1)
-						}
 
-						validatorIdString := "[VALIDATOR\t" + s.host.ID()[0:5].Pretty() + "]"
-						parcelCountStatusString := "(" + strconv.Itoa(len(parcelsReceived)) + "/" + strconv.Itoa(totalParcelsNeededCount) + ")"
-						blockIDString := fmt.Sprint(currentBlockID)
-
-						parcelContentsString := "[" + strconv.Itoa(parcelToGet.StartingIndex) + "..." + strconv.Itoa(lastParcelID) + "]"
-						if parcelToGet.SampleCount <= 2 {
-							parcelContentsString = "[" + strconv.Itoa(parcelToGet.StartingIndex) + ", " + strconv.Itoa(lastParcelID) + "]"
-						}
-
-						log.Print(validatorIdString + " " + parcelCountStatusString + " GET " + parcelTypeString + " parcel BID " + blockIDString + " from DHT:\t" + parcelContentsString + "\n")
+						log.Print(
+							printOperation(
+								"[VALIDATOR\t"+s.host.ID()[0:5].Pretty()+"]",
+								false,
+								true,
+								parcelToGet,
+								currentBlockID,
+								RowCount,
+								len(parcelsReceived),
+								totalParcelsNeededCount,
+								-1,
+							),
+						)
 					}
 				}
 
@@ -408,34 +429,30 @@ func (s *Service) StartMessaging(dht *dht.IpfsDHT, stats *Stats, peerType string
 					_, hops, err := dht.GetValueHops(ctx, "/das/sample/"+fmt.Sprint(currentBlockID)+"/"+fmt.Sprint(parcelToGet.StartingIndex))
 
 					if err != nil {
-						// log.Print("[VALIDATOR\t" + s.host.ID()[0:5].Pretty() + "] GetValue(/das/sample/" + fmt.Sprint(currentBlockID) + "/" + fmt.Sprint(randomSampleID) + ") Error: " + err.Error())
+						stats.GetLatencies = append(stats.GetLatencies, time.Since(startTime))
 						stats.TotalFailedGets += 1
 						stats.TotalGetMessages += 1
-						stats.GetLatencies = append(stats.GetLatencies, time.Since(startTime))
 						stats.GetHops = append(stats.GetHops, hops)
 					} else {
-						stats.TotalGetMessages += 1
 						stats.GetLatencies = append(stats.GetLatencies, time.Since(startTime))
+						stats.TotalGetMessages += 1
 						stats.GetHops = append(stats.GetHops, hops)
 
 						parcelsReceived = append(parcelsReceived, parcelToGet)
-						parcelTypeString := colorize("COL", "green")
-						lastParcelID := parcelToGet.StartingIndex + (parcelToGet.SampleCount-1)*RowCount
-						if parcelToGet.IsRow {
-							parcelTypeString = colorize("ROW", "blue")
-							lastParcelID = parcelToGet.StartingIndex + (parcelToGet.SampleCount - 1)
-						}
 
-						validatorIdString := "[VALIDATOR\t" + s.host.ID()[0:5].Pretty() + "]"
-						parcelCountStatusString := "(" + strconv.Itoa(len(parcelsReceived)) + "/" + strconv.Itoa(totalParcelsNeededCount) + ")"
-						blockIDString := fmt.Sprint(currentBlockID)
-
-						parcelContentsString := "[" + strconv.Itoa(parcelToGet.StartingIndex) + "..." + strconv.Itoa(lastParcelID) + "]"
-						if parcelToGet.SampleCount <= 2 {
-							parcelContentsString = "[" + strconv.Itoa(parcelToGet.StartingIndex) + ", " + strconv.Itoa(lastParcelID) + "]"
-						}
-
-						log.Print(validatorIdString + " " + parcelCountStatusString + " GET " + parcelTypeString + " parcel BID " + blockIDString + " SID " + strconv.Itoa(randomSampleID) + " from DHT:\t" + parcelContentsString + "\n")
+						log.Print(
+							printOperation(
+								"[VALIDATOR\t"+s.host.ID()[0:5].Pretty()+"]",
+								false,
+								true,
+								parcelToGet,
+								currentBlockID,
+								RowCount,
+								len(parcelsReceived),
+								totalParcelsNeededCount,
+								randomSampleID,
+							),
+						)
 					}
 				}
 
@@ -504,35 +521,30 @@ func (s *Service) StartMessaging(dht *dht.IpfsDHT, stats *Stats, peerType string
 					_, hops, err := dht.GetValueHops(ctx, "/das/sample/"+fmt.Sprint(currentBlockID)+"/"+fmt.Sprint(parcelToGet.StartingIndex))
 
 					if err != nil {
-						// log.Print("[VALIDATOR\t" + s.host.ID()[0:5].Pretty() + "] GetValue(/das/sample/" + fmt.Sprint(currentBlockID) + "/" + fmt.Sprint(randomSampleID) + ") Error: " + err.Error())
+						stats.GetLatencies = append(stats.GetLatencies, time.Since(startTime))
 						stats.TotalFailedGets += 1
 						stats.TotalGetMessages += 1
-						stats.GetLatencies = append(stats.GetLatencies, time.Since(startTime))
 						stats.GetHops = append(stats.GetHops, hops)
 					} else {
-						parcelsReceived = append(parcelsReceived, parcelToGet)
-						stats.TotalGetMessages += 1
 						stats.GetLatencies = append(stats.GetLatencies, time.Since(startTime))
+						stats.TotalGetMessages += 1
 						stats.GetHops = append(stats.GetHops, hops)
 
-						parcelTypeString := colorize("COL", "green")
-						lastParcelID := parcelToGet.StartingIndex + (parcelToGet.SampleCount-1)*RowCount
-						if parcelToGet.IsRow {
-							parcelTypeString = colorize("ROW", "blue")
-							lastParcelID = parcelToGet.StartingIndex + (parcelToGet.SampleCount - 1)
-						}
+						parcelsReceived = append(parcelsReceived, parcelToGet)
 
-						validatorIdString := "[NON VALIDATOR\t" + s.host.ID()[0:5].Pretty() + "]"
-						parcelCountStatusString := "(" + strconv.Itoa(len(parcelsReceived)) + "/" + strconv.Itoa(randomParcelsNeededCount) + ")"
-						blockIDString := fmt.Sprint(currentBlockID)
-
-						parcelContentsString := "[" + strconv.Itoa(parcelToGet.StartingIndex) + "..." + strconv.Itoa(lastParcelID) + "]"
-						if parcelToGet.SampleCount <= 2 {
-							parcelContentsString = "[" + strconv.Itoa(parcelToGet.StartingIndex) + ", " + strconv.Itoa(lastParcelID) + "]"
-						}
-
-						log.Print(validatorIdString + " " + parcelCountStatusString + " GET " + parcelTypeString + " parcel BID " + blockIDString + " SID " + strconv.Itoa(randomSampleID) + " from DHT:\t" + parcelContentsString + "\n")
-
+						log.Print(
+							printOperation(
+								"[NON VALIDATOR\t"+s.host.ID()[0:5].Pretty()+"]",
+								false,
+								true,
+								parcelToGet,
+								currentBlockID,
+								RowCount,
+								len(parcelsReceived),
+								randomParcelsNeededCount,
+								randomSampleID,
+							),
+						)
 					}
 				}
 			}
