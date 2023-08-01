@@ -61,10 +61,9 @@ func Discover(ctx context.Context, h host.Host, dht *dht.IpfsDHT, rendezvous str
 			}
 
 			// ? Check if the number of peers and number of dht routing table peers are the same
-			if (len(peers) > 0) && (len(peers)-1 != len(dht.RoutingTable().ListPeers())) {
-				log.Printf("Found %d peers and %d dht peers\n", len(peers), len(dht.RoutingTable().ListPeers()))
-
-			}
+			// if (len(peers) > 0) && (len(peers)-1 != len(dht.RoutingTable().ListPeers())) {
+			// 	log.Printf("Found %d peers and %d dht peers\n", len(peers), len(dht.RoutingTable().ListPeers()))
+			// }
 
 		}
 	}

@@ -34,11 +34,18 @@ type Stats struct {
 	TotalGetMessages int
 	TotalFailedGets  int
 	TotalSuccessGets int
-	// Array of latencies for puts
+
+	// ? Array of latencies for puts
 	PutLatencies []time.Duration
-	// Array of latencies for gets
+	// ? Array of latencies for gets
 	GetLatencies []time.Duration
-	// Array of hops for gets
+	// ? How long it takes to get 2 rows
+	RowSamplingLatencies []time.Duration
+	// ? How long it takes to get 2 cols
+	ColSamplingLatencies []time.Duration
+	// ? How long it takes to get 75 random cells
+	RandomSamplingLatencies []time.Duration
+	// ? Array of hops for gets
 	GetHops []int
 }
 
@@ -186,16 +193,37 @@ func writeLatencyStatsToFile(stats *Stats, h host.Host, nodeType string) (string
 	var latencyRows [][]string
 	for i := 0; i < len(stats.PutLatencies) || i < len(stats.GetLatencies) || i < len(stats.GetHops); i++ {
 		var row []string
+
 		if i < len(stats.PutLatencies) {
 			row = append(row, strconv.FormatInt(stats.PutLatencies[i].Microseconds(), 10))
 		} else {
 			row = append(row, "")
 		}
+
 		if i < len(stats.GetLatencies) {
 			row = append(row, strconv.FormatInt(stats.GetLatencies[i].Microseconds(), 10))
 		} else {
 			row = append(row, "")
 		}
+
+		if i < len(stats.RowSamplingLatencies) {
+			row = append(row, strconv.FormatInt(stats.RowSamplingLatencies[i].Microseconds(), 10))
+		} else {
+			row = append(row, "")
+		}
+
+		if i < len(stats.ColSamplingLatencies) {
+			row = append(row, strconv.FormatInt(stats.ColSamplingLatencies[i].Microseconds(), 10))
+		} else {
+			row = append(row, "")
+		}
+
+		if i < len(stats.RandomSamplingLatencies) {
+			row = append(row, strconv.FormatInt(stats.RandomSamplingLatencies[i].Microseconds(), 10))
+		} else {
+			row = append(row, "")
+		}
+
 		if i < len(stats.GetHops) {
 			row = append(row, strconv.Itoa(stats.GetHops[i]))
 		} else {
@@ -214,7 +242,7 @@ func writeLatencyStatsToFile(stats *Stats, h host.Host, nodeType string) (string
 	w := csv.NewWriter(f)
 	defer w.Flush()
 
-	headers := []string{"PUT latencies (us)", "GET latencies (us)", "GET hops"}
+	headers := []string{"PUT latencies (us)", "GET latencies (us)", "Row Sampling Latencies (us)", "Col Sampling Latencies (us)", "Random Sampling Latencies (us)", "GET hops"}
 	rows := latencyRows
 
 	// Write headers and rows to CSV file
