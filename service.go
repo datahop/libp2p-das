@@ -131,10 +131,10 @@ func (s *Service) StartMessaging(dht *dht.IpfsDHT, stats *Stats, peerType string
 	ticker := time.NewTicker(time.Millisecond * 500)
 	defer ticker.Stop()
 
-	const RowCount = 12
+	const RowCount = 512
 	const TotalSamplesCount = RowCount * RowCount
 	const TotalBlocksCount = 10
-	const ParcelSize = 12
+	const ParcelSize = 256
 
 	blockID := 0
 	currentBlockID := 0
@@ -174,7 +174,7 @@ func (s *Service) StartMessaging(dht *dht.IpfsDHT, stats *Stats, peerType string
 	colParcelsNeededCount *= 2
 
 	// ? 75 random samples too
-	randomParcelsNeededCount := 3
+	randomParcelsNeededCount := 75
 
 	totalParcelsNeededCount := rowParcelsNeededCount + colParcelsNeededCount + randomParcelsNeededCount
 
