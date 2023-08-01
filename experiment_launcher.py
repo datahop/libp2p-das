@@ -66,7 +66,7 @@ def node_partition(nb_cluster_machine, nb_builder, nb_validator, nb_regular):
 def main(output_dir):
     #========== Parameters ==========
     #Grid5000 parameters
-    login = "kpeeroo" #Grid5000 login
+    login = "mapigaglio" #Grid5000 login
     site = "nancy" #Grid5000 Site See: https://www.grid5000.fr/w/Status and https://www.grid5000.fr/w/Hardware
     cluster = "gros" #Gride5000 Cluster name See: https://www.grid5000.fr/w/Status and https://www.grid5000.fr/w/Hardware
     job_name = "PANDAS_libp2p"
@@ -76,12 +76,12 @@ def main(output_dir):
     launch_script = dir_path +"/" + "run.sh"
 
     #Experiment parameters
-    nb_cluster_machine = 2         #Number of machine booked on the cluster
-    nb_experiment_node = 21        #Number of nodes running for the experiment
+    nb_cluster_machine = 30         #Number of machine booked on the cluster
+    nb_experiment_node = 1000        #Number of nodes running for the experiment
     nb_builder = 1
-    nb_validator = 10
+    nb_validator = 100
     nb_regular = nb_experiment_node - nb_builder - nb_validator
-    exp_duration = 60               #In seconds
+    exp_duration = 600               #In seconds
     experiment_name = f"PANDAS_libp2p_{nb_builder}b_{nb_validator}v_{nb_regular}r_{exp_duration}sec_"
     current_datetime = datetime.datetime.now()
     experiment_name += current_datetime.strftime("%Y-%m-%d-%H:%M:%S") 
@@ -114,7 +114,7 @@ def main(output_dir):
     #Validate Grid5000 configuration
     start = datetime.datetime.now() #Timestamp grid5000 job start
     provider = en.G5k(conf)
-    roles, networks = provider.init(force_deploy=True)
+    roles, networks = provider.init()
     roles = en.sync_info(roles, networks)
 
     # #========== Grid5000 network emulation configuration ==========
@@ -140,12 +140,21 @@ def main(output_dir):
     ssh_command = f'scp {launch_script} {login}@access.grid5000.fr:{site}'
     execute_ssh_command(ssh_command, login, site)
     i = 0
+
+    results = en.run_command("ip -o -4 addr show scope global | awk '!/^[0-9]+: lo:/ {print $4}' | cut -d '/' -f 1", roles=roles["experiment"][0])
+    ip = results[0].payload["stdout"]
+
+    
     for x in roles["experiment"]:
         with en.actions(roles=x, on_error_continue=True, background=True) as p:
-            builder, validator, regular = partition[i]
-            p.shell(f"/home/{login}/run.sh {exp_duration} {experiment_name} {builder} {validator} {regular} {login}")
-            i += 1
-
+            if x == roles["experiment"][0]:
+                builder, validator, regular = partition[i]
+                p.shell(f"/home/{login}/run.sh {exp_duration} {experiment_name} {builder} {validator} {regular} {login} 127.0.0.1")
+                i += 1
+            else:
+                builder, validator, regular = partition[i]
+                p.shell(f"/home/{login}/run.sh {exp_duration} {experiment_name} {builder} {validator} {regular} {login} {ip}")
+                i += 1
     start = datetime.datetime.now() #Timestamp grid5000 job start
 
     #========== Wait job and and release grid5000 ressources ==========
@@ -157,14 +166,15 @@ def main(output_dir):
     for i in track(range(exp_duration + 20), description="Waiting for experiment to finish..."):
         time.sleep(1)
 
+    """
     if output_dir != None:
-        """
+        
         1. Get all folders in remote results folder
         2. Get all folders in local folder
         3. Find the ones that are remote and not in local folder
         4. Download them
         5. Remove them from remote folder
-        """
+        
 
         results_dir = f"/results"
 
@@ -186,10 +196,11 @@ def main(output_dir):
             subprocess.run(f"scp -rC {login}@access.grid5000.fr:{site}{remote_path} {local_path}")
         
         # Remove them from remote folder
+        
         for folder in folders_to_download:
             remote_path = os.path.join(results_dir, folder)
             subprocess.run(["ssh", f"{login}@access.grid5000.fr", f"rm -rf {site}{remote_path}"])
-
+        """
     #Release all Grid'5000 resources
     # netem.destroy()
     provider.destroy()
