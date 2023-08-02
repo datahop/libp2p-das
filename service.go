@@ -134,7 +134,7 @@ func (s *Service) StartMessaging(dht *dht.IpfsDHT, stats *Stats, peerType string
 	const RowCount = 512
 	const TotalSamplesCount = RowCount * RowCount
 	const TotalBlocksCount = 10
-	const ParcelSize = 512
+	const ParcelSize = 256
 
 	blockID := 0
 	currentBlockID := 0
@@ -146,7 +146,6 @@ func (s *Service) StartMessaging(dht *dht.IpfsDHT, stats *Stats, peerType string
 	}
 
 	parcels := SplitSamplesIntoParcels(RowCount, ParcelSize)
-	var parcelsSent []Parcel
 	var parcelsReceived []Parcel
 
 	// ! Validator Variables:
@@ -187,46 +186,17 @@ func (s *Service) StartMessaging(dht *dht.IpfsDHT, stats *Stats, peerType string
 			if peerType == "builder" {
 
 				// ? If all parcels are sent, go to the next block
-				if len(parcelsSent) >= len(SplitSamplesIntoParcels(RowCount, ParcelSize)) && blockID < TotalBlocksCount {
+				if len(parcels) == 0 && blockID < TotalBlocksCount {
 					blockID += 1
-					parcelsSent = make([]Parcel, 0)
 					parcels = SplitSamplesIntoParcels(RowCount, ParcelSize)
 				}
 
 				// ? If all blocks are sent, stop
 				if blockID >= TotalBlocksCount {
-					// log.Println("All blocks sent from builder.")
 					continue
 				}
 
-				// ? Pick a random parcel that has not been sent yet
-				parcelID := 0
-				parcelToSend := parcels[parcelID]
-				if len(parcels) > 1 {
-					parcelID = rand.Intn(len(parcels))
-					parcelToSend = parcels[parcelID]
-				} else {
-					parcels = SplitSamplesIntoParcels(RowCount, ParcelSize)
-				}
-
-				parcelSent := false
-				for _, p := range parcelsSent {
-					// ? If the parcel ID and type are the same, pick another parcel
-					if p.StartingIndex == parcelToSend.StartingIndex && p.IsRow == parcelToSend.IsRow {
-						parcelSent = true
-						break
-					}
-				}
-
-				// ? If the parcel has been sent, pick another parcel
-				if parcelSent {
-					continue
-				}
-
-				if parcelID != 0 {
-					// ? Remove the parcel from the list of parcels to send
-					parcels = append(parcels[:parcelID], parcels[parcelID+1:]...)
-				}
+				parcelToSend := parcels[0]
 
 				// ? Get the samples - 512 bytes per sample
 				parcelSamplesToSend := make([]byte, parcelToSend.SampleCount*512)
@@ -267,10 +237,13 @@ func (s *Service) StartMessaging(dht *dht.IpfsDHT, stats *Stats, peerType string
 					log.Printf("[BUILDER\t\t"+s.host.ID()[0:5].Pretty()+"]: DHT Peers: %d\n", len(dht.RoutingTable().ListPeers()))
 
 				} else {
-					stats.TotalPutMessages += 1
 					stats.PutLatencies = append(stats.PutLatencies, time.Since(startTime))
+					stats.TotalPutMessages += 1
 
-					parcelsSent = append(parcelsSent, parcelToSend)
+					// ? Remove first parcel from the list
+					if len(parcels) >= 1 {
+						parcels = parcels[1:]
+					}
 
 					log.Print(
 						printOperation(
@@ -280,7 +253,7 @@ func (s *Service) StartMessaging(dht *dht.IpfsDHT, stats *Stats, peerType string
 							parcelToSend,
 							blockID,
 							RowCount,
-							len(parcelsSent),
+							len(SplitSamplesIntoParcels(RowCount, ParcelSize))-len(parcels),
 							len(SplitSamplesIntoParcels(RowCount, ParcelSize)),
 							-1,
 						),
