@@ -590,18 +590,36 @@ func (s *Service) StartMessaging(dht *dht.IpfsDHT, stats *Stats, peerType string
 
 					}
 
+					// ? If the parcel is empty, continue to next loop
+					if parcelContainingSample == (Parcel{}) {
+						continue
+					}
+
 					// ? Check if the parcelContainingSample is in parcelsReceived
-					parcelFound := false
+					parcelAlreadyReceived := false
 					for _, p := range parcelsReceived {
 						if p.StartingIndex == parcelContainingSample.StartingIndex && p.IsRow == parcelContainingSample.IsRow {
-							parcelFound = true
+							parcelAlreadyReceived = true
 							break
 						}
 					}
 					// ? If the parcel is already received, continue to next loop
-					if parcelFound {
+					if parcelAlreadyReceived {
 						randomParcelsReceivedCount += 1
 						parcelsReceived = append(parcelsReceived, parcelContainingSample)
+						log.Print(
+							printOperation(
+								"[NON VALIDATOR\t"+s.host.ID()[0:5].Pretty()+"]",
+								false,
+								true,
+								parcelContainingSample,
+								currentBlockID,
+								RowCount,
+								randomParcelsReceivedCount,
+								randomParcelsNeededCount,
+								randomSampleID,
+							),
+						)
 						continue
 					}
 
@@ -641,11 +659,12 @@ func (s *Service) StartMessaging(dht *dht.IpfsDHT, stats *Stats, peerType string
 							),
 						)
 					}
-				} else {
-					// log.Print("[NON VALIDATOR\t" + s.host.ID()[0:5].Pretty() + "] Random Sampling Done")
-					if !randomSamplingLatencyRecorded {
-						stats.RandomSamplingLatencies = append(stats.RandomSamplingLatencies, time.Since(randomSamplingStartTime))
-						randomSamplingLatencyRecorded = true
+
+					if randomParcelsReceivedCount == randomParcelsNeededCount {
+						if !randomSamplingLatencyRecorded {
+							stats.RandomSamplingLatencies = append(stats.RandomSamplingLatencies, time.Since(randomSamplingStartTime))
+							randomSamplingLatencyRecorded = true
+						}
 					}
 				}
 			}
