@@ -85,16 +85,6 @@ func main() {
 
 	nodeType := strings.ToLower(config.NodeType)
 
-	if debugMode {
-		log.Printf("Running libp2p-das with the following config:\n")
-		log.Printf("\tRendezvous: %s\n", config.Rendezvous)
-		log.Printf("\tSeed: %d\n", config.Seed)
-		log.Printf("\tDuration: %d\n", config.Duration)
-		log.Printf("\tDiscoveryPeers: %s\n", config.DiscoveryPeers)
-		log.Printf("\tProtocolID: %s\n", config.ProtocolID)
-		log.Printf("\tPort: %d\n\n", config.Port)
-	}
-
 	ctx, cancel := context.WithCancel(context.Background())
 
 	h, err := NewHost(ctx, config.Seed, config.Port)
@@ -111,7 +101,7 @@ func main() {
 		log.Printf("  %s/p2p/%s", addr, h.ID().Pretty())
 	}
 
-	dht, err := NewDHT(ctx, h, config.DiscoveryPeers)
+	dht, err := NewDHT(ctx, h, config.DiscoveryPeers, nodeType)
 	if err != nil {
 		log.Printf("Error creating dht\n")
 		log.Fatal(err)

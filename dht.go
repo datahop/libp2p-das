@@ -18,11 +18,15 @@ func (blankValidator) Select(_ string, _ [][]byte) (int, error) { return 0, nil 
 
 var testPrefix = dht.ProtocolPrefix("/das")
 
-func NewDHT(ctx context.Context, host host.Host, bootstrapPeers []multiaddr.Multiaddr) (*dht.IpfsDHT, error) {
+func NewDHT(ctx context.Context, host host.Host, bootstrapPeers []multiaddr.Multiaddr, nodeType string) (*dht.IpfsDHT, error) {
 	var options []dht.Option
 
-	if len(bootstrapPeers) == 0 {
-		options = append(options, dht.Mode(dht.ModeServer))
+	if nodeType == "nonvalidator" {
+		options = append(options, dht.Mode(dht.ModeClient))
+	} else {
+		if len(bootstrapPeers) == 0 {
+			options = append(options, dht.Mode(dht.ModeServer))
+		}
 	}
 
 	options = append(options, dht.NamespacedValidator("das", blankValidator{}))
