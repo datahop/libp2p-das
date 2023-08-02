@@ -128,13 +128,13 @@ func printOperation(peerIdString string, isPut bool, showParcelStatusFraction bo
 }
 
 func (s *Service) StartMessaging(dht *dht.IpfsDHT, stats *Stats, peerType string, ctx context.Context) {
-	ticker := time.NewTicker(time.Millisecond * 500)
+	ticker := time.NewTicker(time.Nanosecond * 1)
 	defer ticker.Stop()
 
 	const RowCount = 512
 	const TotalSamplesCount = RowCount * RowCount
 	const TotalBlocksCount = 10
-	const ParcelSize = 256
+	const ParcelSize = 512
 
 	blockID := 0
 	currentBlockID := 0
@@ -200,10 +200,14 @@ func (s *Service) StartMessaging(dht *dht.IpfsDHT, stats *Stats, peerType string
 				}
 
 				// ? Pick a random parcel that has not been sent yet
-				parcelID := rand.Intn(len(parcels))
-
-				// ? Get the parcel
+				parcelID := 0
 				parcelToSend := parcels[parcelID]
+				if len(parcels) > 1 {
+					parcelID = rand.Intn(len(parcels))
+					parcelToSend = parcels[parcelID]
+				} else {
+					parcels = SplitSamplesIntoParcels(RowCount, ParcelSize)
+				}
 
 				parcelSent := false
 				for _, p := range parcelsSent {
@@ -219,8 +223,10 @@ func (s *Service) StartMessaging(dht *dht.IpfsDHT, stats *Stats, peerType string
 					continue
 				}
 
-				// ? Remove the parcel from the list of parcels to send
-				parcels = append(parcels[:parcelID], parcels[parcelID+1:]...)
+				if parcelID != 0 {
+					// ? Remove the parcel from the list of parcels to send
+					parcels = append(parcels[:parcelID], parcels[parcelID+1:]...)
+				}
 
 				// ? Get the samples - 512 bytes per sample
 				parcelSamplesToSend := make([]byte, parcelToSend.SampleCount*512)
