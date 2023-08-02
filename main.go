@@ -19,6 +19,7 @@ import (
 
 type Config struct {
 	NodeType       string
+	ParcelSize     int
 	Port           int
 	ProtocolID     string
 	Rendezvous     string
@@ -75,6 +76,7 @@ func main() {
 
 	flag.StringVar(&config.Rendezvous, "rendezvous", "/echo", "")
 	flag.StringVar(&config.NodeType, "nodeType", "validator", "The node type to run (validator, nonvalidator, builder)")
+	flag.IntVar(&config.ParcelSize, "parcelSize", 512, "The size of the parcels to send - make sure 512 divides evenly into this number")
 	flag.Int64Var(&config.Seed, "seed", 0, "Seed value for generating a PeerID, 0 is random")
 	flag.Var(&config.DiscoveryPeers, "peer", "Peer multiaddress for peer discovery")
 	flag.StringVar(&config.ProtocolID, "protocolid", "/p2p/rpc", "")
@@ -120,7 +122,7 @@ func main() {
 
 	// Start the messaging service in a separate goroutine
 	go func() {
-		service.StartMessaging(dht, stats, nodeType, ctx)
+		service.StartMessaging(dht, stats, nodeType, config.ParcelSize, ctx)
 	}()
 
 	// Wait for the timer to expire

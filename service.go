@@ -49,15 +49,15 @@ func (s *Service) SetupRPC() error {
 	return nil
 }
 
-func SplitSamplesIntoParcels(RowCount, ParcelSize int) []Parcel {
+func SplitSamplesIntoParcels(RowCount, parcelSize int) []Parcel {
 	TotalSamplesCount := RowCount * RowCount
 	parcels := make([]Parcel, 0)
 
 	// Split the samples into row parcels
-	for i := 0; i < TotalSamplesCount; i += ParcelSize {
+	for i := 0; i < TotalSamplesCount; i += parcelSize {
 		parcel := Parcel{
 			StartingIndex: i,
-			SampleCount:   ParcelSize,
+			SampleCount:   parcelSize,
 			IsRow:         true,
 		}
 		parcels = append(parcels, parcel)
@@ -67,11 +67,11 @@ func SplitSamplesIntoParcels(RowCount, ParcelSize int) []Parcel {
 	rowID := 0
 	colID := 0
 	for colID < RowCount {
-		for i := 0; i < ParcelSize; i++ {
+		for i := 0; i < parcelSize; i++ {
 			parcelID := rowID*RowCount + colID
 			parcel := Parcel{
 				StartingIndex: parcelID,
-				SampleCount:   ParcelSize,
+				SampleCount:   parcelSize,
 				IsRow:         false,
 			}
 			if i == 0 {
@@ -127,14 +127,13 @@ func printOperation(peerIdString string, isPut bool, showParcelStatusFraction bo
 	return output
 }
 
-func (s *Service) StartMessaging(dht *dht.IpfsDHT, stats *Stats, peerType string, ctx context.Context) {
+func (s *Service) StartMessaging(dht *dht.IpfsDHT, stats *Stats, peerType string, parcelSize int, ctx context.Context) {
 	ticker := time.NewTicker(time.Nanosecond * 1)
 	defer ticker.Stop()
 
 	const RowCount = 512
 	const TotalSamplesCount = RowCount * RowCount
 	const TotalBlocksCount = 10
-	const ParcelSize = 256
 
 	blockID := 0
 	currentBlockID := 0
@@ -145,7 +144,7 @@ func (s *Service) StartMessaging(dht *dht.IpfsDHT, stats *Stats, peerType string
 		sampleIDs[i] = i
 	}
 
-	parcels := SplitSamplesIntoParcels(RowCount, ParcelSize)
+	parcels := SplitSamplesIntoParcels(RowCount, parcelSize)
 	var parcelsReceived []Parcel
 
 	// ! Validator Variables:
@@ -164,11 +163,11 @@ func (s *Service) StartMessaging(dht *dht.IpfsDHT, stats *Stats, peerType string
 	// ? Find out how many parcels are needed to make up at least half the row
 	halfRowCount := RowCount / 2
 
-	rowParcelsNeededCount := halfRowCount/ParcelSize + 1
+	rowParcelsNeededCount := halfRowCount/parcelSize + 1
 	// ? 2 rows
 	rowParcelsNeededCount *= 2
 
-	colParcelsNeededCount := halfRowCount/ParcelSize + 1
+	colParcelsNeededCount := halfRowCount/parcelSize + 1
 	// ? 2 columns
 	colParcelsNeededCount *= 2
 
@@ -188,7 +187,7 @@ func (s *Service) StartMessaging(dht *dht.IpfsDHT, stats *Stats, peerType string
 				// ? If all parcels are sent, go to the next block
 				if len(parcels) == 0 && blockID < TotalBlocksCount {
 					blockID += 1
-					parcels = SplitSamplesIntoParcels(RowCount, ParcelSize)
+					parcels = SplitSamplesIntoParcels(RowCount, parcelSize)
 				}
 
 				// ? If all blocks are sent, stop
@@ -253,8 +252,8 @@ func (s *Service) StartMessaging(dht *dht.IpfsDHT, stats *Stats, peerType string
 							parcelToSend,
 							blockID,
 							RowCount,
-							len(SplitSamplesIntoParcels(RowCount, ParcelSize))-len(parcels),
-							len(SplitSamplesIntoParcels(RowCount, ParcelSize)),
+							len(SplitSamplesIntoParcels(RowCount, parcelSize))-len(parcels),
+							len(SplitSamplesIntoParcels(RowCount, parcelSize)),
 							-1,
 						),
 					)
