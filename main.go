@@ -36,6 +36,9 @@ type Stats struct {
 	TotalFailedGets  int
 	TotalSuccessGets int
 
+	// ? How long it took the builder to put a block into DHT
+	SeedingLatencies []time.Duration
+
 	// ? Array of latencies for puts
 	PutLatencies []time.Duration
 	// ? Array of latencies for gets
@@ -96,12 +99,12 @@ func main() {
 		log.Fatal(err)
 	}
 
-	log.Print(colorize("Created Host ID: "+h.ID()[0:7].Pretty()+"\n", "white"))
+	// log.Print(colorize("Created Host ID: "+h.ID()[0:7].Pretty()+"\n", "white"))
 
-	log.Printf("Connect to me on:")
-	for _, addr := range h.Addrs() {
-		log.Printf("  %s/p2p/%s", addr, h.ID().Pretty())
-	}
+	// log.Printf("Connect to me on:")
+	// for _, addr := range h.Addrs() {
+	// 	log.Printf("  %s/p2p/%s", addr, h.ID().Pretty())
+	// }
 
 	dht, err := NewDHT(ctx, h, config.DiscoveryPeers, nodeType)
 	if err != nil {
@@ -183,8 +186,14 @@ func writeLatencyStatsToFile(stats *Stats, h host.Host, nodeType string) (string
 
 	// Convert latencies and hops to rows
 	var latencyRows [][]string
-	for i := 0; i < len(stats.PutLatencies) || i < len(stats.GetLatencies) || i < len(stats.GetHops); i++ {
+	for i := 0; i < len(stats.SeedingLatencies) || i < len(stats.PutLatencies) || i < len(stats.GetLatencies) || i < len(stats.GetHops); i++ {
 		var row []string
+
+		if i < len(stats.SeedingLatencies) {
+			row = append(row, strconv.FormatInt(stats.SeedingLatencies[i].Microseconds(), 10))
+		} else {
+			row = append(row, "")
+		}
 
 		if i < len(stats.PutLatencies) {
 			row = append(row, strconv.FormatInt(stats.PutLatencies[i].Microseconds(), 10))
@@ -234,7 +243,7 @@ func writeLatencyStatsToFile(stats *Stats, h host.Host, nodeType string) (string
 	w := csv.NewWriter(f)
 	defer w.Flush()
 
-	headers := []string{"PUT latencies (us)", "GET latencies (us)", "Row Sampling Latencies (us)", "Col Sampling Latencies (us)", "Random Sampling Latencies (us)", "GET hops"}
+	headers := []string{"Block Seeding Duration (us)", "PUT latencies (us)", "GET latencies (us)", "Row Sampling Latencies (us)", "Col Sampling Latencies (us)", "Random Sampling Latencies (us)", "GET hops"}
 	rows := latencyRows
 
 	// Write headers and rows to CSV file

@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"log"
-	"math/rand"
 	"strconv"
 	"time"
 
@@ -127,544 +126,545 @@ func printOperation(peerIdString string, isPut bool, showParcelStatusFraction bo
 	return output
 }
 
-func (s *Service) StartMessaging(dht *dht.IpfsDHT, stats *Stats, peerType string, parcelSize int, ctx context.Context) {
-	ticker := time.NewTicker(time.Nanosecond * 1)
-	defer ticker.Stop()
+// func (s *Service) StartMessaging(dht *dht.IpfsDHT, stats *Stats, peerType string, parcelSize int, ctx context.Context) {
+// 	ticker := time.NewTicker(time.Millisecond * 100)
+// 	defer ticker.Stop()
 
-	const RowCount = 512
-	const TotalSamplesCount = RowCount * RowCount
-	const TotalBlocksCount = 10
+// 	const RowCount = 512
+// 	const TotalSamplesCount = RowCount * RowCount
+// 	const TotalBlocksCount = 10
 
-	blockID := 0
-
-	parcels := SplitSamplesIntoParcels(RowCount, parcelSize)
-	var parcelsReceived []Parcel
+// 	blockID := 0
 
-	// ! Validator Variables:
-	colParcelsReceivedCount := 0
-	rowParcelsReceivedCount := 0
-	randomParcelsReceivedCount := 0
-
-	rowSamplingStartTime := time.Now()
-	colSamplingStartTime := time.Now()
-	randomSamplingStartTime := time.Now()
-
-	rowSamplingLatencyRecorded := false
-	colSamplingLatencyRecorded := false
-	randomSamplingLatencyRecorded := false
-
-	// ? Find out how many parcels are needed to make up at least half the row
-	halfRowCount := RowCount / 2
-
-	rowParcelsNeededCount := halfRowCount/parcelSize + 1
-	// ? 2 rows
-	rowParcelsNeededCount *= 2
-
-	colParcelsNeededCount := halfRowCount/parcelSize + 1
-	// ? 2 columns
-	colParcelsNeededCount *= 2
-
-	// ? 75 random samples too
-	randomParcelsNeededCount := 75
-
-	totalParcelsNeededCount := rowParcelsNeededCount + colParcelsNeededCount + randomParcelsNeededCount
-
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		case <-ticker.C:
-
-			if peerType == "builder" {
-
-				// ? If all parcels are sent, go to the next block
-				if len(parcels) == 0 && blockID < TotalBlocksCount {
-					blockID += 1
-					parcels = SplitSamplesIntoParcels(RowCount, parcelSize)
-				}
-
-				// ? If all blocks are sent, stop
-				if blockID >= TotalBlocksCount {
-					continue
-				}
-
-				parcelToSend := parcels[0]
-
-				// ? Get the samples - 512 bytes per sample
-				parcelSamplesToSend := make([]byte, parcelToSend.SampleCount*512)
-
-				peers := FilterSelf(s.host.Peerstore().Peers(), s.host.ID())
-				dhtPeers := FilterSelf(dht.RoutingTable().ListPeers(), s.host.ID())
-
-				// ? No peers found, skip
-				if len(peers) == 0 && len(dhtPeers) == 0 {
-					continue
-				}
-
-				// ? Manually add peers to routing table
-				if len(peers) == 0 || len(dhtPeers) == 0 {
-					for _, p := range peers {
-						_, err := dht.RoutingTable().TryAddPeer(p, false, true)
-						if err != nil {
-							log.Printf("Failed to add peer %s : %s\n", p[0:5].Pretty(), err.Error())
-						}
-					}
-				}
-
-				startTime := time.Now()
-
-				parcelType := "row"
-				if !parcelToSend.IsRow {
-					parcelType = "col"
-				}
-
-				// ? Put parcel samples into DHT
-				putErr := dht.PutValue(ctx, "/das/sample/"+fmt.Sprint(blockID)+"/"+parcelType+"/"+fmt.Sprint(parcelToSend.StartingIndex), parcelSamplesToSend)
-
-				if putErr != nil {
-					stats.TotalFailedPuts += 1
-					stats.PutLatencies = append(stats.PutLatencies, time.Since(startTime))
-
-					log.Print("[BUILDER\t\t" + s.host.ID()[0:5].Pretty() + "] PutValue() Error: " + putErr.Error())
-					log.Printf("[BUILDER\t\t"+s.host.ID()[0:5].Pretty()+"]: DHT Peers: %d\n", len(dht.RoutingTable().ListPeers()))
-
-				} else {
-					stats.PutLatencies = append(stats.PutLatencies, time.Since(startTime))
-					stats.TotalPutMessages += 1
-
-					// ? Remove first parcel from the list
-					if len(parcels) >= 1 {
-						parcels = parcels[1:]
-					}
-
-					log.Print(
-						printOperation(
-							"[BUILDER\t"+s.host.ID()[0:5].Pretty()+"]",
-							true,
-							true,
-							parcelToSend,
-							blockID,
-							RowCount,
-							len(SplitSamplesIntoParcels(RowCount, parcelSize))-len(parcels),
-							len(SplitSamplesIntoParcels(RowCount, parcelSize)),
-							-1,
-						),
-					)
-
-				}
-
-			} else if peerType == "validator" {
-
-				// ? If all parcels are received, go to the next block
-				if len(parcelsReceived) >= totalParcelsNeededCount && blockID < TotalBlocksCount && blockID >= 0 {
-					blockID += 1
-					colParcelsReceivedCount = 0
-					rowParcelsReceivedCount = 0
-					randomParcelsReceivedCount = 0
-
-					rowSamplingStartTime = time.Now()
-					colSamplingStartTime = time.Now()
-					randomSamplingStartTime = time.Now()
-
-					rowSamplingLatencyRecorded = false
-					colSamplingLatencyRecorded = false
-					randomSamplingLatencyRecorded = false
-
-					parcelsReceived = make([]Parcel, 0)
-				}
-
-				// ! Row Parcel Sampling
-
-				// ? Get row parcel
-				if rowParcelsReceivedCount < rowParcelsNeededCount {
-					// ? Pick a random row parcel that has not been received yet
-					parcelID := rand.Intn(len(parcels))
-					for _, p := range parcelsReceived {
-						// ? If the parcel ID and type has already been received, record it and continue
-						if p.StartingIndex == parcels[parcelID].StartingIndex && p.IsRow == parcels[parcelID].IsRow {
-							rowParcelsReceivedCount += 1
-							parcelsReceived = append(parcelsReceived, parcels[parcelID])
-							log.Print(
-								printOperation(
-									"[VALIDATOR\t"+s.host.ID()[0:5].Pretty()+"]",
-									false,
-									true,
-									parcels[parcelID],
-									blockID,
-									RowCount,
-									rowParcelsReceivedCount,
-									rowParcelsNeededCount,
-									-1,
-								),
-							)
-							continue
-						}
-					}
-
-					// ? Get the parcel
-					parcelToGet := parcels[parcelID]
-					parcelType := "row"
-					if !parcelToGet.IsRow {
-						parcelType = "col"
-					}
-					startTime := time.Now()
-					_, hops, err := dht.GetValueHops(ctx, "/das/sample/"+fmt.Sprint(blockID)+"/"+parcelType+"/"+fmt.Sprint(parcelToGet.StartingIndex))
-					if err != nil {
-						stats.GetLatencies = append(stats.GetLatencies, time.Since(startTime))
-						stats.TotalFailedGets += 1
-						stats.TotalGetMessages += 1
-						stats.GetHops = append(stats.GetHops, hops)
-					} else {
-						stats.GetLatencies = append(stats.GetLatencies, time.Since(startTime))
-						stats.TotalGetMessages += 1
-						stats.GetHops = append(stats.GetHops, hops)
-
-						rowParcelsReceivedCount += 1
-						parcelsReceived = append(parcelsReceived, parcelToGet)
-
-						log.Print(
-							printOperation(
-								"[VALIDATOR\t"+s.host.ID()[0:5].Pretty()+"]",
-								false,
-								true,
-								parcelToGet,
-								blockID,
-								RowCount,
-								rowParcelsReceivedCount,
-								rowParcelsNeededCount,
-								-1,
-							),
-						)
-					}
-				} else {
-					// log.Print("[VALIDATOR\t" + s.host.ID()[0:5].Pretty() + "] Row Sampling Done.")
-					if !rowSamplingLatencyRecorded {
-						stats.RowSamplingLatencies = append(stats.RowSamplingLatencies, time.Since(rowSamplingStartTime))
-						rowSamplingLatencyRecorded = true
-					}
-				}
-
-				// ! Col Parcel Sampling
-
-				// ? Get col parcel
-				if colParcelsReceivedCount < colParcelsNeededCount {
-					// ? Pick a random col parcel that has not been received yet
-					parcelID := rand.Intn(len(parcels))
-					for _, p := range parcelsReceived {
-						// ? If the parcel ID and type has already been received, record it and continue
-						if p.StartingIndex == parcels[parcelID].StartingIndex && p.IsRow == parcels[parcelID].IsRow {
-							colParcelsReceivedCount += 1
-							parcelsReceived = append(parcelsReceived, parcels[parcelID])
-							log.Print(
-								printOperation(
-									"[VALIDATOR\t"+s.host.ID()[0:5].Pretty()+"]",
-									false,
-									true,
-									parcels[parcelID],
-									blockID,
-									RowCount,
-									colParcelsReceivedCount,
-									colParcelsNeededCount,
-									-1,
-								),
-							)
-							continue
-						}
-					}
-
-					// ? Get the parcel
-					parcelToGet := parcels[parcelID]
-					if parcelToGet.IsRow {
-						continue
-					}
-					startTime := time.Now()
-					_, hops, err := dht.GetValueHops(ctx, "/das/sample/"+fmt.Sprint(blockID)+"/col/"+fmt.Sprint(parcelToGet.StartingIndex))
-					if err != nil {
-						stats.GetLatencies = append(stats.GetLatencies, time.Since(startTime))
-						stats.TotalFailedGets += 1
-						stats.TotalGetMessages += 1
-						stats.GetHops = append(stats.GetHops, hops)
-					} else {
-						stats.GetLatencies = append(stats.GetLatencies, time.Since(startTime))
-						stats.TotalGetMessages += 1
-						stats.GetHops = append(stats.GetHops, hops)
-
-						colParcelsReceivedCount += 1
-						parcelsReceived = append(parcelsReceived, parcelToGet)
-
-						log.Print(
-							printOperation(
-								"[VALIDATOR\t"+s.host.ID()[0:5].Pretty()+"]",
-								false,
-								true,
-								parcelToGet,
-								blockID,
-								RowCount,
-								colParcelsReceivedCount,
-								colParcelsNeededCount,
-								-1,
-							),
-						)
-					}
-				} else {
-					// log.Print("[VALIDATOR\t" + s.host.ID()[0:5].Pretty() + "] Col Sampling Done.")
-					if !colSamplingLatencyRecorded {
-						stats.ColSamplingLatencies = append(stats.ColSamplingLatencies, time.Since(colSamplingStartTime))
-						colSamplingLatencyRecorded = true
-					}
-				}
-
-				// ! 75 Random Parcel Sampling
-
-				if randomParcelsReceivedCount < randomParcelsNeededCount {
-					randomSampleID := rand.Intn(TotalSamplesCount)
-
-					// ? Find the parcel that contains the sample
-					parcelContainingSample := Parcel{}
-					for _, parcel := range parcels {
-						parcelSampleIDs := make([]int, parcel.SampleCount)
-
-						if parcel.IsRow {
-							for i := 0; i < parcel.SampleCount; i++ {
-								parcelSampleIDs[i] = parcel.StartingIndex + i
-							}
-						} else {
-							for i := 0; i < parcel.SampleCount; i++ {
-								parcelSampleIDs[i] = parcel.StartingIndex + i*RowCount
-							}
-						}
-
-						// ? If the parcel contains the sample, break
-						found := false
-						for _, id := range parcelSampleIDs {
-							if id == randomSampleID {
-								found = true
-								break
-							}
-						}
-
-						if found {
-							parcelContainingSample = parcel
-							break
-						}
-
-					}
-
-					// ? If the parcel is empty, continue to next loop
-					if parcelContainingSample == (Parcel{}) {
-						continue
-					}
-
-					// ? Check if the parcelContainingSample is in parcelsReceived
-					parcelAlreadyReceived := false
-					for _, p := range parcelsReceived {
-						if p.StartingIndex == parcelContainingSample.StartingIndex && p.IsRow == parcelContainingSample.IsRow {
-							parcelAlreadyReceived = true
-							break
-						}
-					}
-
-					// ? If the parcel is already received, continue to next loop
-					if parcelAlreadyReceived {
-						randomParcelsReceivedCount += 1
-						parcelsReceived = append(parcelsReceived, parcelContainingSample)
-						log.Print(
-							printOperation(
-								"[VALIDATOR\t"+s.host.ID()[0:5].Pretty()+"]",
-								false,
-								true,
-								parcelContainingSample,
-								blockID,
-								RowCount,
-								randomParcelsReceivedCount,
-								randomParcelsNeededCount,
-								randomSampleID,
-							),
-						)
-						continue
-					}
-
-					// ? Get the parcel
-					parcelToGet := parcelContainingSample
-					parcelType := "row"
-					if !parcelToGet.IsRow {
-						parcelType = "col"
-					}
-					startTime := time.Now()
-					_, hops, err := dht.GetValueHops(ctx, "/das/sample/"+fmt.Sprint(blockID)+"/"+parcelType+"/"+fmt.Sprint(parcelToGet.StartingIndex))
-					if err != nil {
-						stats.GetLatencies = append(stats.GetLatencies, time.Since(startTime))
-						stats.TotalFailedGets += 1
-						stats.TotalGetMessages += 1
-						stats.GetHops = append(stats.GetHops, hops)
-					} else {
-						stats.GetLatencies = append(stats.GetLatencies, time.Since(startTime))
-						stats.TotalGetMessages += 1
-						stats.GetHops = append(stats.GetHops, hops)
-
-						randomParcelsReceivedCount += 1
-						parcelsReceived = append(parcelsReceived, parcelToGet)
-
-						log.Print(
-							printOperation(
-								"[VALIDATOR\t"+s.host.ID()[0:5].Pretty()+"]",
-								false,
-								true,
-								parcelToGet,
-								blockID,
-								RowCount,
-								randomParcelsReceivedCount,
-								randomParcelsNeededCount,
-								randomSampleID,
-							),
-						)
-					}
-
-					if randomParcelsReceivedCount == randomParcelsNeededCount {
-						if !randomSamplingLatencyRecorded {
-							stats.RandomSamplingLatencies = append(stats.RandomSamplingLatencies, time.Since(randomSamplingStartTime))
-							randomSamplingLatencyRecorded = true
-						}
-					}
-
-				}
-
-			} else if peerType == "nonvalidator" {
-
-				// ? Reset timers if all parcels are received
-				if len(parcelsReceived) == 0 && blockID > 0 {
-					randomSamplingStartTime = time.Now()
-					randomSamplingLatencyRecorded = false
-					randomParcelsReceivedCount = 0
-				}
-
-				// ! 75 Random Parcel Sampling
-
-				// ? If all parcels are received, go to the next block
-				if len(parcelsReceived) >= randomParcelsNeededCount && blockID < TotalBlocksCount {
-					blockID += 1
-					randomParcelsReceivedCount = 0
-					randomSamplingStartTime = time.Now()
-					randomSamplingLatencyRecorded = false
-					parcelsReceived = make([]Parcel, 0)
-				}
-
-				if randomParcelsReceivedCount < randomParcelsNeededCount {
-					randomSampleID := rand.Intn(TotalSamplesCount)
-
-					// ? Find the parcel that contains the sample
-					parcelContainingSample := Parcel{}
-					for _, parcel := range parcels {
-						parcelSampleIDs := make([]int, parcel.SampleCount)
-
-						if parcel.IsRow {
-							for i := 0; i < parcel.SampleCount; i++ {
-								parcelSampleIDs[i] = parcel.StartingIndex + i
-							}
-						} else {
-							for i := 0; i < parcel.SampleCount; i++ {
-								parcelSampleIDs[i] = parcel.StartingIndex + i*RowCount
-							}
-						}
-
-						// ? If the parcel contains the sample, break
-						found := false
-						for _, id := range parcelSampleIDs {
-							if id == randomSampleID {
-								found = true
-								break
-							}
-						}
-
-						if found {
-							parcelContainingSample = parcel
-							break
-						}
-
-					}
-
-					// ? If the parcel is empty, continue to next loop
-					if parcelContainingSample == (Parcel{}) {
-						continue
-					}
-
-					// ? Check if the parcelContainingSample is in parcelsReceived
-					parcelAlreadyReceived := false
-					for _, p := range parcelsReceived {
-						if p.StartingIndex == parcelContainingSample.StartingIndex && p.IsRow == parcelContainingSample.IsRow {
-							parcelAlreadyReceived = true
-							break
-						}
-					}
-					// ? If the parcel is already received, continue to next loop
-					if parcelAlreadyReceived {
-						randomParcelsReceivedCount += 1
-						parcelsReceived = append(parcelsReceived, parcelContainingSample)
-						log.Print(
-							printOperation(
-								"[NON VALIDATOR\t"+s.host.ID()[0:5].Pretty()+"]",
-								false,
-								true,
-								parcelContainingSample,
-								blockID,
-								RowCount,
-								randomParcelsReceivedCount,
-								randomParcelsNeededCount,
-								randomSampleID,
-							),
-						)
-						continue
-					}
-
-					// ? Get the parcel
-					parcelToGet := parcelContainingSample
-					parcelType := "row"
-					if !parcelToGet.IsRow {
-						parcelType = "col"
-					}
-					startTime := time.Now()
-					_, hops, err := dht.GetValueHops(ctx, "/das/sample/"+fmt.Sprint(blockID)+"/"+parcelType+"/"+fmt.Sprint(parcelToGet.StartingIndex))
-
-					if err != nil {
-						stats.GetLatencies = append(stats.GetLatencies, time.Since(startTime))
-						stats.TotalFailedGets += 1
-						stats.TotalGetMessages += 1
-						stats.GetHops = append(stats.GetHops, hops)
-					} else {
-						stats.GetLatencies = append(stats.GetLatencies, time.Since(startTime))
-						stats.TotalGetMessages += 1
-						stats.GetHops = append(stats.GetHops, hops)
-
-						randomParcelsReceivedCount += 1
-						parcelsReceived = append(parcelsReceived, parcelToGet)
-
-						log.Print(
-							printOperation(
-								"[NON VALIDATOR\t"+s.host.ID()[0:5].Pretty()+"]",
-								false,
-								true,
-								parcelToGet,
-								blockID,
-								RowCount,
-								randomParcelsReceivedCount,
-								randomParcelsNeededCount,
-								randomSampleID,
-							),
-						)
-					}
-
-					if randomParcelsReceivedCount == randomParcelsNeededCount {
-						if !randomSamplingLatencyRecorded {
-							stats.RandomSamplingLatencies = append(stats.RandomSamplingLatencies, time.Since(randomSamplingStartTime))
-							randomSamplingLatencyRecorded = true
-						}
-					}
-				}
-			}
-
-		}
-	}
-}
+// 	parcels := SplitSamplesIntoParcels(RowCount, parcelSize)
+
+// 	var parcelsReceived []Parcel
+
+// 	// ! Validator Variables:
+// 	colParcelsReceivedCount := 0
+// 	rowParcelsReceivedCount := 0
+// 	randomParcelsReceivedCount := 0
+
+// 	rowSamplingStartTime := time.Now()
+// 	colSamplingStartTime := time.Now()
+// 	randomSamplingStartTime := time.Now()
+
+// 	rowSamplingLatencyRecorded := false
+// 	colSamplingLatencyRecorded := false
+// 	randomSamplingLatencyRecorded := false
+
+// 	// ? Find out how many parcels are needed to make up at least half the row
+// 	halfRowCount := RowCount / 2
+
+// 	rowParcelsNeededCount := halfRowCount/parcelSize + 1
+// 	// ? 2 rows
+// 	rowParcelsNeededCount *= 2
+
+// 	colParcelsNeededCount := halfRowCount/parcelSize + 1
+// 	// ? 2 columns
+// 	colParcelsNeededCount *= 2
+
+// 	// ? 75 random samples too
+// 	randomParcelsNeededCount := 75
+
+// 	totalParcelsNeededCount := rowParcelsNeededCount + colParcelsNeededCount + randomParcelsNeededCount
+
+// 	for {
+// 		select {
+// 		case <-ctx.Done():
+// 			return
+// 		case <-ticker.C:
+
+// 			if peerType == "builder" {
+
+// 				// ? If all parcels are sent, go to the next block
+// 				if len(parcels) == 0 && blockID < TotalBlocksCount {
+// 					blockID += 1
+// 					parcels = SplitSamplesIntoParcels(RowCount, parcelSize)
+// 				}
+
+// 				// ? If all blocks are sent, stop
+// 				if blockID >= TotalBlocksCount {
+// 					continue
+// 				}
+
+// 				parcelToSend := parcels[0]
+
+// 				// ? Get the samples - 512 bytes per sample
+// 				parcelSamplesToSend := make([]byte, parcelToSend.SampleCount*512)
+
+// 				peers := FilterSelf(s.host.Peerstore().Peers(), s.host.ID())
+// 				dhtPeers := FilterSelf(dht.RoutingTable().ListPeers(), s.host.ID())
+
+// 				// ? No peers found, skip
+// 				if len(peers) == 0 && len(dhtPeers) == 0 {
+// 					continue
+// 				}
+
+// 				// ? Manually add peers to routing table
+// 				if len(peers) == 0 || len(dhtPeers) == 0 {
+// 					for _, p := range peers {
+// 						_, err := dht.RoutingTable().TryAddPeer(p, false, true)
+// 						if err != nil {
+// 							log.Printf("Failed to add peer %s : %s\n", p[0:5].Pretty(), err.Error())
+// 						}
+// 					}
+// 				}
+
+// 				startTime := time.Now()
+
+// 				parcelType := "row"
+// 				if !parcelToSend.IsRow {
+// 					parcelType = "col"
+// 				}
+
+// 				// ? Put parcel samples into DHT
+// 				putErr := dht.PutValue(ctx, "/das/sample/"+fmt.Sprint(blockID)+"/"+parcelType+"/"+fmt.Sprint(parcelToSend.StartingIndex), parcelSamplesToSend)
+
+// 				if putErr != nil {
+// 					stats.TotalFailedPuts += 1
+// 					stats.PutLatencies = append(stats.PutLatencies, time.Since(startTime))
+
+// 					log.Print("[BUILDER\t\t" + s.host.ID()[0:5].Pretty() + "] PutValue() Error: " + putErr.Error())
+// 					log.Printf("[BUILDER\t\t"+s.host.ID()[0:5].Pretty()+"]: DHT Peers: %d\n", len(dht.RoutingTable().ListPeers()))
+
+// 				} else {
+// 					stats.PutLatencies = append(stats.PutLatencies, time.Since(startTime))
+// 					stats.TotalPutMessages += 1
+
+// 					// ? Remove first parcel from the list
+// 					if len(parcels) >= 1 {
+// 						parcels = parcels[1:]
+// 					}
+
+// 					log.Print(
+// 						printOperation(
+// 							"[BUILDER\t"+s.host.ID()[0:5].Pretty()+"]",
+// 							true,
+// 							true,
+// 							parcelToSend,
+// 							blockID,
+// 							RowCount,
+// 							len(SplitSamplesIntoParcels(RowCount, parcelSize))-len(parcels),
+// 							len(SplitSamplesIntoParcels(RowCount, parcelSize)),
+// 							-1,
+// 						),
+// 					)
+
+// 				}
+
+// 			} else if peerType == "validator" {
+
+// 				// ? If all parcels are received, go to the next block
+// 				if len(parcelsReceived) >= totalParcelsNeededCount && blockID < TotalBlocksCount && blockID >= 0 {
+// 					blockID += 1
+// 					colParcelsReceivedCount = 0
+// 					rowParcelsReceivedCount = 0
+// 					randomParcelsReceivedCount = 0
+
+// 					rowSamplingStartTime = time.Now()
+// 					colSamplingStartTime = time.Now()
+// 					randomSamplingStartTime = time.Now()
+
+// 					rowSamplingLatencyRecorded = false
+// 					colSamplingLatencyRecorded = false
+// 					randomSamplingLatencyRecorded = false
+
+// 					parcelsReceived = make([]Parcel, 0)
+// 				}
+
+// 				// ! Row Parcel Sampling
+
+// 				// ? Get row parcel
+// 				if rowParcelsReceivedCount < rowParcelsNeededCount {
+// 					// ? Pick a random row parcel that has not been received yet
+// 					parcelID := rand.Intn(len(parcels))
+// 					for _, p := range parcelsReceived {
+// 						// ? If the parcel ID and type has already been received, record it and continue
+// 						if p.StartingIndex == parcels[parcelID].StartingIndex && p.IsRow == parcels[parcelID].IsRow {
+// 							rowParcelsReceivedCount += 1
+// 							parcelsReceived = append(parcelsReceived, parcels[parcelID])
+// 							log.Print(
+// 								printOperation(
+// 									"[VALIDATOR\t"+s.host.ID()[0:5].Pretty()+"]",
+// 									false,
+// 									true,
+// 									parcels[parcelID],
+// 									blockID,
+// 									RowCount,
+// 									rowParcelsReceivedCount,
+// 									rowParcelsNeededCount,
+// 									-1,
+// 								),
+// 							)
+// 							continue
+// 						}
+// 					}
+
+// 					// ? Get the parcel
+// 					parcelToGet := parcels[parcelID]
+// 					parcelType := "row"
+// 					if !parcelToGet.IsRow {
+// 						parcelType = "col"
+// 					}
+// 					startTime := time.Now()
+// 					_, hops, err := dht.GetValueHops(ctx, "/das/sample/"+fmt.Sprint(blockID)+"/"+parcelType+"/"+fmt.Sprint(parcelToGet.StartingIndex))
+// 					if err != nil {
+// 						stats.GetLatencies = append(stats.GetLatencies, time.Since(startTime))
+// 						stats.TotalFailedGets += 1
+// 						stats.TotalGetMessages += 1
+// 						stats.GetHops = append(stats.GetHops, hops)
+// 					} else {
+// 						stats.GetLatencies = append(stats.GetLatencies, time.Since(startTime))
+// 						stats.TotalGetMessages += 1
+// 						stats.GetHops = append(stats.GetHops, hops)
+
+// 						rowParcelsReceivedCount += 1
+// 						parcelsReceived = append(parcelsReceived, parcelToGet)
+
+// 						log.Print(
+// 							printOperation(
+// 								"[VALIDATOR\t"+s.host.ID()[0:5].Pretty()+"]",
+// 								false,
+// 								true,
+// 								parcelToGet,
+// 								blockID,
+// 								RowCount,
+// 								rowParcelsReceivedCount,
+// 								rowParcelsNeededCount,
+// 								-1,
+// 							),
+// 						)
+// 					}
+// 				} else {
+// 					// log.Print("[VALIDATOR\t" + s.host.ID()[0:5].Pretty() + "] Row Sampling Done.")
+// 					if !rowSamplingLatencyRecorded {
+// 						stats.RowSamplingLatencies = append(stats.RowSamplingLatencies, time.Since(rowSamplingStartTime))
+// 						rowSamplingLatencyRecorded = true
+// 					}
+// 				}
+
+// 				// ! Col Parcel Sampling
+
+// 				// ? Get col parcel
+// 				if colParcelsReceivedCount < colParcelsNeededCount {
+// 					// ? Pick a random col parcel that has not been received yet
+// 					parcelID := rand.Intn(len(parcels))
+// 					for _, p := range parcelsReceived {
+// 						// ? If the parcel ID and type has already been received, record it and continue
+// 						if p.StartingIndex == parcels[parcelID].StartingIndex && p.IsRow == parcels[parcelID].IsRow {
+// 							colParcelsReceivedCount += 1
+// 							parcelsReceived = append(parcelsReceived, parcels[parcelID])
+// 							log.Print(
+// 								printOperation(
+// 									"[VALIDATOR\t"+s.host.ID()[0:5].Pretty()+"]",
+// 									false,
+// 									true,
+// 									parcels[parcelID],
+// 									blockID,
+// 									RowCount,
+// 									colParcelsReceivedCount,
+// 									colParcelsNeededCount,
+// 									-1,
+// 								),
+// 							)
+// 							continue
+// 						}
+// 					}
+
+// 					// ? Get the parcel
+// 					parcelToGet := parcels[parcelID]
+// 					if parcelToGet.IsRow {
+// 						continue
+// 					}
+// 					startTime := time.Now()
+// 					_, hops, err := dht.GetValueHops(ctx, "/das/sample/"+fmt.Sprint(blockID)+"/col/"+fmt.Sprint(parcelToGet.StartingIndex))
+// 					if err != nil {
+// 						stats.GetLatencies = append(stats.GetLatencies, time.Since(startTime))
+// 						stats.TotalFailedGets += 1
+// 						stats.TotalGetMessages += 1
+// 						stats.GetHops = append(stats.GetHops, hops)
+// 					} else {
+// 						stats.GetLatencies = append(stats.GetLatencies, time.Since(startTime))
+// 						stats.TotalGetMessages += 1
+// 						stats.GetHops = append(stats.GetHops, hops)
+
+// 						colParcelsReceivedCount += 1
+// 						parcelsReceived = append(parcelsReceived, parcelToGet)
+
+// 						log.Print(
+// 							printOperation(
+// 								"[VALIDATOR\t"+s.host.ID()[0:5].Pretty()+"]",
+// 								false,
+// 								true,
+// 								parcelToGet,
+// 								blockID,
+// 								RowCount,
+// 								colParcelsReceivedCount,
+// 								colParcelsNeededCount,
+// 								-1,
+// 							),
+// 						)
+// 					}
+// 				} else {
+// 					// log.Print("[VALIDATOR\t" + s.host.ID()[0:5].Pretty() + "] Col Sampling Done.")
+// 					if !colSamplingLatencyRecorded {
+// 						stats.ColSamplingLatencies = append(stats.ColSamplingLatencies, time.Since(colSamplingStartTime))
+// 						colSamplingLatencyRecorded = true
+// 					}
+// 				}
+
+// 				// ! 75 Random Parcel Sampling
+
+// 				if randomParcelsReceivedCount < randomParcelsNeededCount {
+// 					randomSampleID := rand.Intn(TotalSamplesCount)
+
+// 					// ? Find the parcel that contains the sample
+// 					parcelContainingSample := Parcel{}
+// 					for _, parcel := range parcels {
+// 						parcelSampleIDs := make([]int, parcel.SampleCount)
+
+// 						if parcel.IsRow {
+// 							for i := 0; i < parcel.SampleCount; i++ {
+// 								parcelSampleIDs[i] = parcel.StartingIndex + i
+// 							}
+// 						} else {
+// 							for i := 0; i < parcel.SampleCount; i++ {
+// 								parcelSampleIDs[i] = parcel.StartingIndex + i*RowCount
+// 							}
+// 						}
+
+// 						// ? If the parcel contains the sample, break
+// 						found := false
+// 						for _, id := range parcelSampleIDs {
+// 							if id == randomSampleID {
+// 								found = true
+// 								break
+// 							}
+// 						}
+
+// 						if found {
+// 							parcelContainingSample = parcel
+// 							break
+// 						}
+
+// 					}
+
+// 					// ? If the parcel is empty, continue to next loop
+// 					if parcelContainingSample == (Parcel{}) {
+// 						continue
+// 					}
+
+// 					// ? Check if the parcelContainingSample is in parcelsReceived
+// 					parcelAlreadyReceived := false
+// 					for _, p := range parcelsReceived {
+// 						if p.StartingIndex == parcelContainingSample.StartingIndex && p.IsRow == parcelContainingSample.IsRow {
+// 							parcelAlreadyReceived = true
+// 							break
+// 						}
+// 					}
+
+// 					// ? If the parcel is already received, continue to next loop
+// 					if parcelAlreadyReceived {
+// 						randomParcelsReceivedCount += 1
+// 						parcelsReceived = append(parcelsReceived, parcelContainingSample)
+// 						log.Print(
+// 							printOperation(
+// 								"[VALIDATOR\t"+s.host.ID()[0:5].Pretty()+"]",
+// 								false,
+// 								true,
+// 								parcelContainingSample,
+// 								blockID,
+// 								RowCount,
+// 								randomParcelsReceivedCount,
+// 								randomParcelsNeededCount,
+// 								randomSampleID,
+// 							),
+// 						)
+// 						continue
+// 					}
+
+// 					// ? Get the parcel
+// 					parcelToGet := parcelContainingSample
+// 					parcelType := "row"
+// 					if !parcelToGet.IsRow {
+// 						parcelType = "col"
+// 					}
+// 					startTime := time.Now()
+// 					_, hops, err := dht.GetValueHops(ctx, "/das/sample/"+fmt.Sprint(blockID)+"/"+parcelType+"/"+fmt.Sprint(parcelToGet.StartingIndex))
+// 					if err != nil {
+// 						stats.GetLatencies = append(stats.GetLatencies, time.Since(startTime))
+// 						stats.TotalFailedGets += 1
+// 						stats.TotalGetMessages += 1
+// 						stats.GetHops = append(stats.GetHops, hops)
+// 					} else {
+// 						stats.GetLatencies = append(stats.GetLatencies, time.Since(startTime))
+// 						stats.TotalGetMessages += 1
+// 						stats.GetHops = append(stats.GetHops, hops)
+
+// 						randomParcelsReceivedCount += 1
+// 						parcelsReceived = append(parcelsReceived, parcelToGet)
+
+// 						log.Print(
+// 							printOperation(
+// 								"[VALIDATOR\t"+s.host.ID()[0:5].Pretty()+"]",
+// 								false,
+// 								true,
+// 								parcelToGet,
+// 								blockID,
+// 								RowCount,
+// 								randomParcelsReceivedCount,
+// 								randomParcelsNeededCount,
+// 								randomSampleID,
+// 							),
+// 						)
+// 					}
+
+// 					if randomParcelsReceivedCount == randomParcelsNeededCount {
+// 						if !randomSamplingLatencyRecorded {
+// 							stats.RandomSamplingLatencies = append(stats.RandomSamplingLatencies, time.Since(randomSamplingStartTime))
+// 							randomSamplingLatencyRecorded = true
+// 						}
+// 					}
+
+// 				}
+
+// 			} else if peerType == "nonvalidator" {
+
+// 				// ? Reset timers if all parcels are received
+// 				if len(parcelsReceived) == 0 && blockID > 0 {
+// 					randomSamplingStartTime = time.Now()
+// 					randomSamplingLatencyRecorded = false
+// 					randomParcelsReceivedCount = 0
+// 				}
+
+// 				// ! 75 Random Parcel Sampling
+
+// 				// ? If all parcels are received, go to the next block
+// 				if len(parcelsReceived) >= randomParcelsNeededCount && blockID < TotalBlocksCount {
+// 					blockID += 1
+// 					randomParcelsReceivedCount = 0
+// 					randomSamplingStartTime = time.Now()
+// 					randomSamplingLatencyRecorded = false
+// 					parcelsReceived = make([]Parcel, 0)
+// 				}
+
+// 				if randomParcelsReceivedCount < randomParcelsNeededCount {
+// 					randomSampleID := rand.Intn(TotalSamplesCount)
+
+// 					// ? Find the parcel that contains the sample
+// 					parcelContainingSample := Parcel{}
+// 					for _, parcel := range parcels {
+// 						parcelSampleIDs := make([]int, parcel.SampleCount)
+
+// 						if parcel.IsRow {
+// 							for i := 0; i < parcel.SampleCount; i++ {
+// 								parcelSampleIDs[i] = parcel.StartingIndex + i
+// 							}
+// 						} else {
+// 							for i := 0; i < parcel.SampleCount; i++ {
+// 								parcelSampleIDs[i] = parcel.StartingIndex + i*RowCount
+// 							}
+// 						}
+
+// 						// ? If the parcel contains the sample, break
+// 						found := false
+// 						for _, id := range parcelSampleIDs {
+// 							if id == randomSampleID {
+// 								found = true
+// 								break
+// 							}
+// 						}
+
+// 						if found {
+// 							parcelContainingSample = parcel
+// 							break
+// 						}
+
+// 					}
+
+// 					// ? If the parcel is empty, continue to next loop
+// 					if parcelContainingSample == (Parcel{}) {
+// 						continue
+// 					}
+
+// 					// ? Check if the parcelContainingSample is in parcelsReceived
+// 					parcelAlreadyReceived := false
+// 					for _, p := range parcelsReceived {
+// 						if p.StartingIndex == parcelContainingSample.StartingIndex && p.IsRow == parcelContainingSample.IsRow {
+// 							parcelAlreadyReceived = true
+// 							break
+// 						}
+// 					}
+// 					// ? If the parcel is already received, continue to next loop
+// 					if parcelAlreadyReceived {
+// 						randomParcelsReceivedCount += 1
+// 						parcelsReceived = append(parcelsReceived, parcelContainingSample)
+// 						log.Print(
+// 							printOperation(
+// 								"[NON VALIDATOR\t"+s.host.ID()[0:5].Pretty()+"]",
+// 								false,
+// 								true,
+// 								parcelContainingSample,
+// 								blockID,
+// 								RowCount,
+// 								randomParcelsReceivedCount,
+// 								randomParcelsNeededCount,
+// 								randomSampleID,
+// 							),
+// 						)
+// 						continue
+// 					}
+
+// 					// ? Get the parcel
+// 					parcelToGet := parcelContainingSample
+// 					parcelType := "row"
+// 					if !parcelToGet.IsRow {
+// 						parcelType = "col"
+// 					}
+// 					startTime := time.Now()
+// 					_, hops, err := dht.GetValueHops(ctx, "/das/sample/"+fmt.Sprint(blockID)+"/"+parcelType+"/"+fmt.Sprint(parcelToGet.StartingIndex))
+
+// 					if err != nil {
+// 						stats.GetLatencies = append(stats.GetLatencies, time.Since(startTime))
+// 						stats.TotalFailedGets += 1
+// 						stats.TotalGetMessages += 1
+// 						stats.GetHops = append(stats.GetHops, hops)
+// 					} else {
+// 						stats.GetLatencies = append(stats.GetLatencies, time.Since(startTime))
+// 						stats.TotalGetMessages += 1
+// 						stats.GetHops = append(stats.GetHops, hops)
+
+// 						randomParcelsReceivedCount += 1
+// 						parcelsReceived = append(parcelsReceived, parcelToGet)
+
+// 						log.Print(
+// 							printOperation(
+// 								"[NON VALIDATOR\t"+s.host.ID()[0:5].Pretty()+"]",
+// 								false,
+// 								true,
+// 								parcelToGet,
+// 								blockID,
+// 								RowCount,
+// 								randomParcelsReceivedCount,
+// 								randomParcelsNeededCount,
+// 								randomSampleID,
+// 							),
+// 						)
+// 					}
+
+// 					if randomParcelsReceivedCount == randomParcelsNeededCount {
+// 						if !randomSamplingLatencyRecorded {
+// 							stats.RandomSamplingLatencies = append(stats.RandomSamplingLatencies, time.Since(randomSamplingStartTime))
+// 							randomSamplingLatencyRecorded = true
+// 						}
+// 					}
+// 				}
+// 			}
+
+// 		}
+// 	}
+// }
 
 func (s *Service) ReceiveEcho(envelope Envelope) Envelope {
 	fmt.Printf("Peer %s got 42KB\n", s.host.ID())
@@ -699,4 +699,78 @@ func CopyEnvelopesToIfaces(in []*Envelope) []interface{} {
 		ifaces[i] = in[i]
 	}
 	return ifaces
+}
+
+func (s *Service) StartMessaging(dht *dht.IpfsDHT, stats *Stats, peerType string, parcelSize int, ctx context.Context) {
+
+	const RowCount = 512
+	const TotalBlocksCount = 10
+
+	if peerType == "builder" {
+
+		blockID := 0
+		for blockID < TotalBlocksCount {
+
+			// ! Network setup
+
+			peers := FilterSelf(s.host.Peerstore().Peers(), s.host.ID())
+			dhtPeers := FilterSelf(dht.RoutingTable().ListPeers(), s.host.ID())
+
+			// ? No peers found, skip
+			if len(peers) == 0 && len(dhtPeers) == 0 {
+				continue
+			}
+
+			// ? Manually add peers to routing table
+			if len(peers) == 0 || len(dhtPeers) == 0 {
+				for _, p := range peers {
+					_, err := dht.RoutingTable().TryAddPeer(p, false, true)
+					if err != nil {
+						log.Printf("Failed to add peer %s : %s\n", p[0:5].Pretty(), err.Error())
+					}
+				}
+			}
+
+			// ! Seeding
+
+			seedingTime := time.Now()
+			parcelsSentCount := 0
+
+			parcels := SplitSamplesIntoParcels(RowCount, parcelSize)
+			for _, parcel := range parcels {
+
+				parcelSamplesToSend := make([]byte, parcel.SampleCount*512)
+
+				parcelType := "row"
+				if !parcel.IsRow {
+					parcelType = "col"
+				}
+
+				putErr := dht.PutValue(ctx, "/das/sample/"+fmt.Sprint(blockID)+"/"+parcelType+"/"+fmt.Sprint(parcel.StartingIndex), parcelSamplesToSend)
+
+				if putErr != nil {
+					log.Println("Failed to put parcel")
+					log.Println(putErr)
+				} else {
+					stats.TotalPutMessages += 1
+					parcelsSentCount += 1
+				}
+
+				if parcelsSentCount == len(parcels) {
+					stats.SeedingLatencies = append(stats.SeedingLatencies, time.Since(seedingTime))
+					log.Printf("B%d: Seeding took %.2f seconds.\n", blockID, time.Since(seedingTime).Seconds())
+				}
+
+			}
+
+			blockID += 1
+		}
+
+	} else if peerType == "validator" {
+		log.Println("Hello from validator")
+	} else if peerType == "nonvalidator" {
+		log.Println("Hello from non validator")
+	} else {
+		panic("Peer type not recognized: " + peerType)
+	}
 }
