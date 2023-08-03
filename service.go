@@ -136,7 +136,6 @@ func (s *Service) StartMessaging(dht *dht.IpfsDHT, stats *Stats, peerType string
 	const TotalBlocksCount = 10
 
 	blockID := 0
-	currentBlockID := 0
 
 	parcels := SplitSamplesIntoParcels(RowCount, parcelSize)
 	var parcelsReceived []Parcel
@@ -257,8 +256,8 @@ func (s *Service) StartMessaging(dht *dht.IpfsDHT, stats *Stats, peerType string
 			} else if peerType == "validator" {
 
 				// ? If all parcels are received, go to the next block
-				if len(parcelsReceived) >= totalParcelsNeededCount && currentBlockID < TotalBlocksCount && currentBlockID >= 0 {
-					currentBlockID += 1
+				if len(parcelsReceived) >= totalParcelsNeededCount && blockID < TotalBlocksCount && blockID >= 0 {
+					blockID += 1
 					colParcelsReceivedCount = 0
 					rowParcelsReceivedCount = 0
 					randomParcelsReceivedCount = 0
@@ -291,7 +290,7 @@ func (s *Service) StartMessaging(dht *dht.IpfsDHT, stats *Stats, peerType string
 									false,
 									true,
 									parcels[parcelID],
-									currentBlockID,
+									blockID,
 									RowCount,
 									rowParcelsReceivedCount,
 									rowParcelsNeededCount,
@@ -309,7 +308,7 @@ func (s *Service) StartMessaging(dht *dht.IpfsDHT, stats *Stats, peerType string
 						parcelType = "col"
 					}
 					startTime := time.Now()
-					_, hops, err := dht.GetValueHops(ctx, "/das/sample/"+fmt.Sprint(currentBlockID)+"/"+parcelType+"/"+fmt.Sprint(parcelToGet.StartingIndex))
+					_, hops, err := dht.GetValueHops(ctx, "/das/sample/"+fmt.Sprint(blockID)+"/"+parcelType+"/"+fmt.Sprint(parcelToGet.StartingIndex))
 					if err != nil {
 						stats.GetLatencies = append(stats.GetLatencies, time.Since(startTime))
 						stats.TotalFailedGets += 1
@@ -329,7 +328,7 @@ func (s *Service) StartMessaging(dht *dht.IpfsDHT, stats *Stats, peerType string
 								false,
 								true,
 								parcelToGet,
-								currentBlockID,
+								blockID,
 								RowCount,
 								rowParcelsReceivedCount,
 								rowParcelsNeededCount,
@@ -362,7 +361,7 @@ func (s *Service) StartMessaging(dht *dht.IpfsDHT, stats *Stats, peerType string
 									false,
 									true,
 									parcels[parcelID],
-									currentBlockID,
+									blockID,
 									RowCount,
 									colParcelsReceivedCount,
 									colParcelsNeededCount,
@@ -379,7 +378,7 @@ func (s *Service) StartMessaging(dht *dht.IpfsDHT, stats *Stats, peerType string
 						continue
 					}
 					startTime := time.Now()
-					_, hops, err := dht.GetValueHops(ctx, "/das/sample/"+fmt.Sprint(currentBlockID)+"/col/"+fmt.Sprint(parcelToGet.StartingIndex))
+					_, hops, err := dht.GetValueHops(ctx, "/das/sample/"+fmt.Sprint(blockID)+"/col/"+fmt.Sprint(parcelToGet.StartingIndex))
 					if err != nil {
 						stats.GetLatencies = append(stats.GetLatencies, time.Since(startTime))
 						stats.TotalFailedGets += 1
@@ -399,7 +398,7 @@ func (s *Service) StartMessaging(dht *dht.IpfsDHT, stats *Stats, peerType string
 								false,
 								true,
 								parcelToGet,
-								currentBlockID,
+								blockID,
 								RowCount,
 								colParcelsReceivedCount,
 								colParcelsNeededCount,
@@ -475,7 +474,7 @@ func (s *Service) StartMessaging(dht *dht.IpfsDHT, stats *Stats, peerType string
 								false,
 								true,
 								parcelContainingSample,
-								currentBlockID,
+								blockID,
 								RowCount,
 								randomParcelsReceivedCount,
 								randomParcelsNeededCount,
@@ -492,7 +491,7 @@ func (s *Service) StartMessaging(dht *dht.IpfsDHT, stats *Stats, peerType string
 						parcelType = "col"
 					}
 					startTime := time.Now()
-					_, hops, err := dht.GetValueHops(ctx, "/das/sample/"+fmt.Sprint(currentBlockID)+"/"+parcelType+"/"+fmt.Sprint(parcelToGet.StartingIndex))
+					_, hops, err := dht.GetValueHops(ctx, "/das/sample/"+fmt.Sprint(blockID)+"/"+parcelType+"/"+fmt.Sprint(parcelToGet.StartingIndex))
 					if err != nil {
 						stats.GetLatencies = append(stats.GetLatencies, time.Since(startTime))
 						stats.TotalFailedGets += 1
@@ -512,7 +511,7 @@ func (s *Service) StartMessaging(dht *dht.IpfsDHT, stats *Stats, peerType string
 								false,
 								true,
 								parcelToGet,
-								currentBlockID,
+								blockID,
 								RowCount,
 								randomParcelsReceivedCount,
 								randomParcelsNeededCount,
@@ -533,7 +532,7 @@ func (s *Service) StartMessaging(dht *dht.IpfsDHT, stats *Stats, peerType string
 			} else if peerType == "nonvalidator" {
 
 				// ? Reset timers if all parcels are received
-				if len(parcelsReceived) == 0 && currentBlockID > 0 {
+				if len(parcelsReceived) == 0 && blockID > 0 {
 					randomSamplingStartTime = time.Now()
 					randomSamplingLatencyRecorded = false
 					randomParcelsReceivedCount = 0
@@ -542,8 +541,8 @@ func (s *Service) StartMessaging(dht *dht.IpfsDHT, stats *Stats, peerType string
 				// ! 75 Random Parcel Sampling
 
 				// ? If all parcels are received, go to the next block
-				if len(parcelsReceived) >= randomParcelsNeededCount && currentBlockID < TotalBlocksCount {
-					currentBlockID += 1
+				if len(parcelsReceived) >= randomParcelsNeededCount && blockID < TotalBlocksCount {
+					blockID += 1
 					randomParcelsReceivedCount = 0
 					randomSamplingStartTime = time.Now()
 					randomSamplingLatencyRecorded = false
@@ -607,7 +606,7 @@ func (s *Service) StartMessaging(dht *dht.IpfsDHT, stats *Stats, peerType string
 								false,
 								true,
 								parcelContainingSample,
-								currentBlockID,
+								blockID,
 								RowCount,
 								randomParcelsReceivedCount,
 								randomParcelsNeededCount,
@@ -624,7 +623,7 @@ func (s *Service) StartMessaging(dht *dht.IpfsDHT, stats *Stats, peerType string
 						parcelType = "col"
 					}
 					startTime := time.Now()
-					_, hops, err := dht.GetValueHops(ctx, "/das/sample/"+fmt.Sprint(currentBlockID)+"/"+parcelType+"/"+fmt.Sprint(parcelToGet.StartingIndex))
+					_, hops, err := dht.GetValueHops(ctx, "/das/sample/"+fmt.Sprint(blockID)+"/"+parcelType+"/"+fmt.Sprint(parcelToGet.StartingIndex))
 
 					if err != nil {
 						stats.GetLatencies = append(stats.GetLatencies, time.Since(startTime))
@@ -645,7 +644,7 @@ func (s *Service) StartMessaging(dht *dht.IpfsDHT, stats *Stats, peerType string
 								false,
 								true,
 								parcelToGet,
-								currentBlockID,
+								blockID,
 								RowCount,
 								randomParcelsReceivedCount,
 								randomParcelsNeededCount,
