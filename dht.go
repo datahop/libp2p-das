@@ -24,9 +24,7 @@ func NewDHT(ctx context.Context, host host.Host, bootstrapPeers []multiaddr.Mult
 	if nodeType == "nonvalidator" {
 		options = append(options, dht.Mode(dht.ModeClient))
 	} else {
-		if len(bootstrapPeers) == 0 {
-			options = append(options, dht.Mode(dht.ModeServer))
-		}
+		options = append(options, dht.Mode(dht.ModeServer))
 	}
 
 	options = append(options, dht.NamespacedValidator("das", blankValidator{}))
