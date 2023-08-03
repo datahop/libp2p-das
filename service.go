@@ -138,12 +138,6 @@ func (s *Service) StartMessaging(dht *dht.IpfsDHT, stats *Stats, peerType string
 	blockID := 0
 	currentBlockID := 0
 
-	// ? Generate 512 x 512 IDs for each sample starting from 0 to 512^2-1
-	sampleIDs := make([]int, TotalSamplesCount)
-	for i := 0; i < TotalSamplesCount; i++ {
-		sampleIDs[i] = i
-	}
-
 	parcels := SplitSamplesIntoParcels(RowCount, parcelSize)
 	var parcelsReceived []Parcel
 
