@@ -11,7 +11,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/fatih/color"
 	"github.com/libp2p/go-libp2p-core/host"
 	"github.com/libp2p/go-libp2p-core/protocol"
 	"github.com/multiformats/go-multiaddr"
@@ -53,23 +52,23 @@ type Stats struct {
 	GetHops []int
 }
 
-func colorize(word string, colorName string) string {
-	var c *color.Color
-	switch colorName {
-	case "red":
-		c = color.New(color.FgRed)
-	case "green":
-		c = color.New(color.FgGreen)
-	case "yellow":
-		c = color.New(color.FgYellow)
-	case "blue":
-		c = color.New(color.FgBlue)
-	default:
-		c = color.New(color.Reset)
-	}
+// func colorize(word string, colorName string) string {
+// 	var c *color.Color
+// 	switch colorName {
+// 	case "red":
+// 		c = color.New(color.FgRed)
+// 	case "green":
+// 		c = color.New(color.FgGreen)
+// 	case "yellow":
+// 		c = color.New(color.FgYellow)
+// 	case "blue":
+// 		c = color.New(color.FgBlue)
+// 	default:
+// 		c = color.New(color.Reset)
+// 	}
 
-	return c.Sprint(word)
-}
+// 	return c.Sprint(word)
+// }
 
 func main() {
 	config := Config{}

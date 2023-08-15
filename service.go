@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
-	"strconv"
+	"math/rand"
 	"time"
 
 	dht "github.com/Blitz3r123/go-libp2p-kad-dht"
@@ -48,7 +48,7 @@ func (s *Service) SetupRPC() error {
 	return nil
 }
 
-func SplitSamplesIntoParcels(RowCount, parcelSize int) []Parcel {
+func SplitSamplesIntoParcels(RowCount, parcelSize int, parcelType string) []Parcel {
 	TotalSamplesCount := RowCount * RowCount
 	parcels := make([]Parcel, 0)
 
@@ -86,44 +86,49 @@ func SplitSamplesIntoParcels(RowCount, parcelSize int) []Parcel {
 		}
 	}
 
+	if parcelType == "all" {
+
+		return parcels
+
+	} else if parcelType == "row" {
+
+		rowParcels := make([]Parcel, 0)
+		for _, parcel := range parcels {
+			if parcel.IsRow {
+				rowParcels = append(rowParcels, parcel)
+			}
+		}
+		return rowParcels
+
+	} else if parcelType == "col" {
+
+		colParcels := make([]Parcel, 0)
+		for _, parcel := range parcels {
+			if !parcel.IsRow {
+				colParcels = append(colParcels, parcel)
+			}
+		}
+		return colParcels
+
+	}
+
 	return parcels
+
 }
 
-func printOperation(peerIdString string, isPut bool, showParcelStatusFraction bool, parcelInvolved Parcel, blockID int, RowCount int, parcelsReceivedCount int, totalParcelsNeededCount int, randomSampleID int) string {
+func getParcelCounts(parcels []Parcel) (int, int) {
+	rowParcelsCount := 0
+	colParcelsCount := 0
 
-	output := peerIdString
-
-	if showParcelStatusFraction {
-		output += " (" + strconv.Itoa(parcelsReceivedCount) + "/" + strconv.Itoa(totalParcelsNeededCount) + ")"
+	for _, parcel := range parcels {
+		if parcel.IsRow {
+			rowParcelsCount++
+		} else {
+			colParcelsCount++
+		}
 	}
 
-	if isPut {
-		output += " PUT "
-	} else {
-		output += " GET "
-	}
-
-	parcelTypeString := colorize("COL", "green")
-	lastParcelID := parcelInvolved.StartingIndex + (parcelInvolved.SampleCount-1)*RowCount
-	if parcelInvolved.IsRow {
-		parcelTypeString = colorize("ROW", "blue")
-		lastParcelID = parcelInvolved.StartingIndex + (parcelInvolved.SampleCount - 1)
-	}
-
-	blockIDString := strconv.Itoa(blockID)
-
-	parcelContentsString := "[" + strconv.Itoa(parcelInvolved.StartingIndex) + "..." + strconv.Itoa(lastParcelID) + "]"
-	if parcelInvolved.SampleCount <= 2 {
-		parcelContentsString = "[" + strconv.Itoa(parcelInvolved.StartingIndex) + ", " + strconv.Itoa(lastParcelID) + "]"
-	}
-
-	if randomSampleID != -1 {
-		output += parcelTypeString + " parcel BID " + blockIDString + " SID " + strconv.Itoa(randomSampleID) + ": " + parcelContentsString
-	} else {
-		output += parcelTypeString + " parcel BID " + blockIDString + ": " + parcelContentsString
-	}
-
-	return output
+	return rowParcelsCount, colParcelsCount
 }
 
 // func (s *Service) StartMessaging(dht *dht.IpfsDHT, stats *Stats, peerType string, parcelSize int, ctx context.Context) {
@@ -708,6 +713,8 @@ func (s *Service) StartMessaging(dht *dht.IpfsDHT, stats *Stats, peerType string
 
 	if peerType == "builder" {
 
+		peerName := "[BUILDER\t" + s.host.ID()[0:5].Pretty() + "]"
+
 		blockID := 0
 		for blockID < TotalBlocksCount {
 
@@ -736,7 +743,7 @@ func (s *Service) StartMessaging(dht *dht.IpfsDHT, stats *Stats, peerType string
 			seedingTime := time.Now()
 			parcelsSentCount := 0
 
-			parcels := SplitSamplesIntoParcels(RowCount, parcelSize)
+			parcels := SplitSamplesIntoParcels(RowCount, parcelSize, "all")
 			for _, parcel := range parcels {
 
 				parcelSamplesToSend := make([]byte, parcel.SampleCount*512)
@@ -746,19 +753,26 @@ func (s *Service) StartMessaging(dht *dht.IpfsDHT, stats *Stats, peerType string
 					parcelType = "col"
 				}
 
-				putErr := dht.PutValue(ctx, "/das/sample/"+fmt.Sprint(blockID)+"/"+parcelType+"/"+fmt.Sprint(parcel.StartingIndex), parcelSamplesToSend)
+				putStartTime := time.Now()
+				putErr := dht.PutValue(
+					ctx,
+					"/das/sample/"+fmt.Sprint(blockID)+"/"+parcelType+"/"+fmt.Sprint(parcel.StartingIndex),
+					parcelSamplesToSend,
+				)
 
 				if putErr != nil {
-					log.Println("Failed to put parcel")
-					log.Println(putErr)
+					// log.Println(peerName + " Failed to put parcel: " + putErr.Error())
+					stats.TotalFailedPuts += 1
+					stats.TotalPutMessages += 1
 				} else {
+					stats.PutLatencies = append(stats.PutLatencies, time.Since(putStartTime))
 					stats.TotalPutMessages += 1
 					parcelsSentCount += 1
 				}
 
 				if parcelsSentCount == len(parcels) {
 					stats.SeedingLatencies = append(stats.SeedingLatencies, time.Since(seedingTime))
-					log.Printf("B%d: Seeding took %.2f seconds.\n", blockID, time.Since(seedingTime).Seconds())
+					log.Printf(peerName+" B%d: Seeding took %.2f seconds.\n", blockID, time.Since(seedingTime).Seconds())
 				}
 
 			}
@@ -767,10 +781,110 @@ func (s *Service) StartMessaging(dht *dht.IpfsDHT, stats *Stats, peerType string
 		}
 
 	} else if peerType == "validator" {
-		log.Println("Hello from validator")
+
+		peerName := "[VALIDATOR\t" + s.host.ID()[0:5].Pretty() + "]"
+
+		blockID := 0
+
+		for blockID < TotalBlocksCount {
+			startTime := time.Now()
+			rowSamplingDurationMicrosec := int64(0)
+			colSamplingDurationMicrosec := int64(0)
+
+			rowColParcelsNeededCount := (RowCount / 2) / parcelSize
+			randomParcelsNeededCount := 75
+
+			allParcels := SplitSamplesIntoParcels(RowCount, parcelSize, "all")
+			rowParcels := SplitSamplesIntoParcels(RowCount, parcelSize, "row")
+			colParcels := SplitSamplesIntoParcels(RowCount, parcelSize, "col")
+
+			randomRowParcels := pickRandomParcels(rowParcels, rowColParcelsNeededCount)
+			randomColParcels := pickRandomParcels(colParcels, rowColParcelsNeededCount)
+			randomParcels := pickRandomParcels(allParcels, randomParcelsNeededCount)
+
+			allRandomParcels := append(randomRowParcels, randomColParcels...)
+			allRandomParcels = append(allRandomParcels, randomParcels...)
+
+			for len(allRandomParcels) > 0 {
+				randomIndex := 0
+				if len(allRandomParcels) > 1 {
+					randomIndex = rand.Intn(len(allRandomParcels))
+				}
+
+				randomParcel := allRandomParcels[randomIndex]
+
+				parcelType := "row"
+				if !randomParcel.IsRow {
+					parcelType = "col"
+				}
+
+				getStartTime := time.Now()
+				_, hops, err := dht.GetValueHops(
+					ctx,
+					"/das/sample/"+fmt.Sprint(blockID)+"/"+parcelType+"/"+fmt.Sprint(randomParcel.StartingIndex),
+				)
+
+				if err != nil {
+					stats.TotalFailedGets += 1
+					stats.TotalGetMessages += 1
+				} else {
+					stats.GetLatencies = append(stats.GetLatencies, time.Since(getStartTime))
+					stats.TotalGetMessages += 1
+					stats.TotalSuccessGets += 1
+					stats.GetHops = append(stats.GetHops, hops)
+
+					allRandomParcels = append(allRandomParcels[:randomIndex], allRandomParcels[randomIndex+1:]...)
+
+					rowParcelCount, colParcelCount := getParcelCounts(allRandomParcels)
+
+					if rowParcelCount == 0 && rowSamplingDurationMicrosec == 0 {
+						rowSamplingDurationMicrosec = time.Since(startTime).Microseconds()
+						stats.RowSamplingLatencies = append(stats.RowSamplingLatencies, time.Since(startTime))
+					}
+
+					if colParcelCount == 0 && colSamplingDurationMicrosec == 0 {
+						colSamplingDurationMicrosec = time.Since(startTime).Microseconds()
+						stats.ColSamplingLatencies = append(stats.ColSamplingLatencies, time.Since(startTime))
+					}
+
+				}
+
+			}
+
+			if len(allRandomParcels) == 0 {
+				log.Printf(peerName+" B%d: All Sampling took %.2f seconds.\n", blockID, time.Since(startTime).Seconds())
+
+				blockID += 1
+			}
+		}
+
 	} else if peerType == "nonvalidator" {
 		log.Println("Hello from non validator")
 	} else {
 		panic("Peer type not recognized: " + peerType)
 	}
+}
+
+func pickRandomParcels(parcels []Parcel, requiredCount int) []Parcel {
+	randomParcels := make([]Parcel, 0)
+	for i := 0; i < requiredCount; i++ {
+		randomIndex := rand.Intn(len(parcels))
+		randomParcel := parcels[randomIndex]
+
+		// ? Check if the random parcel has already been picked
+		alreadyPicked := false
+		for _, p := range randomParcels {
+			if p.StartingIndex == randomParcel.StartingIndex && p.IsRow == randomParcel.IsRow {
+				alreadyPicked = true
+				break
+			}
+		}
+
+		// ? If the random parcel has not been picked, add it to the list
+		if !alreadyPicked {
+			randomParcels = append(randomParcels, randomParcel)
+		}
+	}
+
+	return randomParcels
 }

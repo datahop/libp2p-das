@@ -35,13 +35,14 @@ if %nonBuilderCount% leq 0 (
 )
 
 for /L %%i in (1,1,%builderCount%) do (
-    start /B "" cmd /c run.bat %duration% builder
+    
+    start /B "" run.bat %duration% builder
 )
 
 for /L %%i in (1,1,%validatorCount%) do (
-    start /B "" cmd /c run.bat %duration% validator
+    start /B "" run.bat %duration% validator
 )
 
 for /L %%i in (1,1,%nonValidatorCount%) do (
-    start /B "" cmd /c run.bat %duration% nonvalidator
+    start /B "" run.bat %duration% nonvalidator
 )
