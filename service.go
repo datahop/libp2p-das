@@ -709,11 +709,11 @@ func CopyEnvelopesToIfaces(in []*Envelope) []interface{} {
 func (s *Service) StartMessaging(dht *dht.IpfsDHT, stats *Stats, peerType string, parcelSize int, ctx context.Context) {
 
 	const RowCount = 512
-	const TotalBlocksCount = 10
+	const TotalBlocksCount = 3
 
 	if peerType == "builder" {
 
-		peerName := "[BUILDER\t" + s.host.ID()[0:5].Pretty() + "]"
+		peerName := "[BUILDER\t\t" + s.host.ID()[0:5].Pretty() + "]"
 
 		blockID := 0
 		for blockID < TotalBlocksCount {
@@ -741,36 +741,52 @@ func (s *Service) StartMessaging(dht *dht.IpfsDHT, stats *Stats, peerType string
 			// ! Seeding
 
 			seedingTime := time.Now()
-			parcelsSentCount := 0
 
 			parcels := SplitSamplesIntoParcels(RowCount, parcelSize, "all")
-			for _, parcel := range parcels {
 
-				parcelSamplesToSend := make([]byte, parcel.SampleCount*512)
+			for len(parcels) > 0 {
+
+				randomIndex := 0
+				if len(parcels) > 1 {
+					randomIndex = rand.Intn(len(parcels) - 1)
+				}
+
+				randomParcel := parcels[randomIndex]
+
+				parcelSamplesToSend := make([]byte, randomParcel.SampleCount*512)
 
 				parcelType := "row"
-				if !parcel.IsRow {
+				if !randomParcel.IsRow {
 					parcelType = "col"
 				}
 
 				putStartTime := time.Now()
 				putErr := dht.PutValue(
 					ctx,
-					"/das/sample/"+fmt.Sprint(blockID)+"/"+parcelType+"/"+fmt.Sprint(parcel.StartingIndex),
+					"/das/sample/"+fmt.Sprint(blockID)+"/"+parcelType+"/"+fmt.Sprint(randomParcel.StartingIndex),
 					parcelSamplesToSend,
 				)
 
 				if putErr != nil {
-					// log.Println(peerName + " Failed to put parcel: " + putErr.Error())
 					stats.TotalFailedPuts += 1
 					stats.TotalPutMessages += 1
 				} else {
+					// log.Printf(
+					// 	peerName+" B%d: [%d] PUT parcel %s %d took %.2f seconds.\n",
+					// 	blockID,
+					// 	len(parcels),
+					// 	parcelType,
+					// 	randomParcel.StartingIndex,
+					// 	time.Since(putStartTime).Seconds(),
+					// )
 					stats.PutLatencies = append(stats.PutLatencies, time.Since(putStartTime))
 					stats.TotalPutMessages += 1
-					parcelsSentCount += 1
+
+					parcels = append(parcels[:randomIndex], parcels[randomIndex+1:]...)
+
 				}
 
-				if parcelsSentCount == len(parcels) {
+				if len(parcels) == 0 {
 					stats.SeedingLatencies = append(stats.SeedingLatencies, time.Since(seedingTime))
 					log.Printf(peerName+" B%d: Seeding took %.2f seconds.\n", blockID, time.Since(seedingTime).Seconds())
 				}
@@ -782,7 +798,7 @@ func (s *Service) StartMessaging(dht *dht.IpfsDHT, stats *Stats, peerType string
 
 	} else if peerType == "validator" {
 
-		peerName := "[VALIDATOR\t" + s.host.ID()[0:5].Pretty() + "]"
+		peerName := "[VALIDATOR\t\t" + s.host.ID()[0:5].Pretty() + "]"
 
 		blockID := 0
 
@@ -859,7 +875,68 @@ func (s *Service) StartMessaging(dht *dht.IpfsDHT, stats *Stats, peerType string
 		}
 
 	} else if peerType == "nonvalidator" {
-		log.Println("Hello from non validator")
+
+		peerName := "[NON-VALIDATOR\t" + s.host.ID()[0:5].Pretty() + "]"
+
+		blockID := 0
+
+		for blockID < TotalBlocksCount {
+			startTime := time.Now()
+			randomSamplingDurationMicrosec := int64(0)
+
+			randomParcelsNeededCount := 75
+
+			allParcels := SplitSamplesIntoParcels(RowCount, parcelSize, "all")
+
+			randomParcels := pickRandomParcels(allParcels, randomParcelsNeededCount)
+
+			for len(randomParcels) > 0 {
+				randomIndex := 0
+				if len(randomParcels) > 1 {
+					randomIndex = rand.Intn(len(randomParcels))
+				}
+
+				randomParcel := randomParcels[randomIndex]
+
+				parcelType := "row"
+				if !randomParcel.IsRow {
+					parcelType = "col"
+				}
+
+				getStartTime := time.Now()
+				_, hops, err := dht.GetValueHops(
+					ctx,
+					"/das/sample/"+fmt.Sprint(blockID)+"/"+parcelType+"/"+fmt.Sprint(randomParcel.StartingIndex),
+				)
+
+				if err != nil {
+					stats.TotalFailedGets += 1
+					stats.TotalGetMessages += 1
+				} else {
+					stats.GetLatencies = append(stats.GetLatencies, time.Since(getStartTime))
+					stats.TotalGetMessages += 1
+					stats.TotalSuccessGets += 1
+					stats.GetHops = append(stats.GetHops, hops)
+
+					// log.Printf(peerName+" B%d: GET parcel %s %d\n", blockID, parcelType, randomParcel.StartingIndex)
+
+					randomParcels = append(randomParcels[:randomIndex], randomParcels[randomIndex+1:]...)
+
+					if len(randomParcels) == 0 && randomSamplingDurationMicrosec == 0 {
+						randomSamplingDurationMicrosec = time.Since(startTime).Microseconds()
+						stats.RandomSamplingLatencies = append(stats.RandomSamplingLatencies, time.Since(startTime))
+					}
+
+				}
+
+			}
+
+			if len(randomParcels) == 0 {
+				log.Printf(peerName+" B%d: All Sampling took %.2f seconds.\n", blockID, time.Since(startTime).Seconds())
+				blockID += 1
+			}
+		}
+
 	} else {
 		panic("Peer type not recognized: " + peerType)
 	}

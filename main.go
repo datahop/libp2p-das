@@ -119,17 +119,14 @@ func main() {
 		log.Fatal(err)
 	}
 
-	// Create a timer that runs for x seconds
+	// ? Create a timer that runs for x seconds
 	timer := time.NewTimer(time.Duration(config.Duration) * time.Second)
 
-	// Start the messaging service in a separate goroutine
 	go func() {
 		service.StartMessaging(dht, stats, nodeType, config.ParcelSize, ctx)
 	}()
 
-	// Wait for the timer to expire
 	<-timer.C
-	log.Printf("Timer expired, shutting down...\n")
 
 	if filename, err := writeTotalStatsToFile(stats, h, nodeType); err != nil {
 		log.Fatal(err)
@@ -143,7 +140,6 @@ func main() {
 		log.Printf("[%s] Latencies written to %s\n", h.ID()[0:5].Pretty(), filename)
 	}
 
-	// Cancel the context and exit
 	cancel()
 
 	if err := h.Close(); err != nil {
