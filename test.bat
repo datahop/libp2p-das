@@ -6,18 +6,22 @@ set duration=%1
 set builderCount=%2
 set validatorCount=%3
 set nonValidatorCount=%4
+set parcelSize=%5
 
 if "%duration%"=="" (
-    echo There should be 4 parameters: duration, builderCount, validatorCount, and nonValidatorCount. e.g. test.bat 30 1 2 1
+    echo There should be 5 parameters: duration, builderCount, validatorCount, nonValidatorCount, and parcelSize. e.g. test.bat 30 1 2 1 512
     exit /b
 ) else if "%builderCount%"=="" (
-    echo There should be 4 parameters: duration, builderCount, validatorCount, and nonValidatorCount. e.g. test.bat 30 1 2 1
+    echo There should be 5 parameters: duration, builderCount, validatorCount, nonValidatorCount, and parcelSize. e.g. test.bat 30 1 2 1 512
     exit /b
 ) else if "%validatorCount%"=="" (
-    echo There should be 4 parameters: duration, builderCount, validatorCount, and nonValidatorCount. e.g. test.bat 30 1 2 1
+    echo There should be 5 parameters: duration, builderCount, validatorCount, nonValidatorCount, and parcelSize. e.g. test.bat 30 1 2 1 512
     exit /b
 ) else if "%nonValidatorCount%"=="" (
-    echo There should be 4 parameters: duration, builderCount, validatorCount, and nonValidatorCount. e.g. test.bat 30 1 2 1
+    echo There should be 5 parameters: duration, builderCount, validatorCount, nonValidatorCount, and parcelSize. e.g. test.bat 30 1 2 1 512
+    exit /b
+) else if "%parcelSize%"=="" (
+    echo There should be 5 parameters: duration, builderCount, validatorCount, nonValidatorCount, and parcelSize. e.g. test.bat 30 1 2 1 512
     exit /b
 )
 
@@ -35,14 +39,13 @@ if %nonBuilderCount% leq 0 (
 )
 
 for /L %%i in (1,1,%builderCount%) do (
-    
-    start /B "" run.bat %duration% builder
+    start /B "" run.bat %duration% builder %parcelSize%
 )
 
 for /L %%i in (1,1,%validatorCount%) do (
-    start /B "" run.bat %duration% validator
+    start /B "" run.bat %duration% validator %parcelSize%
 )
 
 for /L %%i in (1,1,%nonValidatorCount%) do (
-    start /B "" run.bat %duration% nonvalidator
+    start /B "" run.bat %duration% nonvalidator %parcelSize%
 )
