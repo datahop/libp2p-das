@@ -100,7 +100,11 @@ func main() {
 		log.Fatal(err)
 	}
 
-	log.Printf("[%s] Host created with ID: %s\n", h.ID()[:5].Pretty(), h.ID()[:5].Pretty())
+	if nodeType == "builder" {
+		log.Printf("[%s] Peer ID: %s\n", h.ID().Pretty()[:5], h.ID().Pretty())
+	}
+
+	log.Printf("[%s] %s Host created with ID: %s\n", h.ID()[:5].Pretty(), nodeType, h.ID()[:5].Pretty())
 
 	dht, err := NewDHT(ctx, h, nodeType)
 	if err != nil {
