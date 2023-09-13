@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"fmt"
 	"io"
+	"log"
 	mrand "math/rand"
 
 	"github.com/libp2p/go-libp2p"
@@ -30,16 +31,17 @@ func NewHost(ctx context.Context, seed int64, port int) (host.Host, error) {
 		return nil, err
 	}
 
-	addr, _ := multiaddr.NewMultiaddr(fmt.Sprintf("/ip4/0.0.0.0/tcp/%d", port))
+	addr, _ := multiaddr.NewMultiaddr(fmt.Sprintf("/ip4/127.0.0.1/tcp/%d", port))
 
 	host, err := libp2p.New(ctx,
 		libp2p.ListenAddrs(addr),
 		libp2p.Identity(priv),
 	)
-
 	if err != nil {
 		return nil, err
 	}
+
+	log.Printf("[%s] Listening on %s\n", host.ID()[0:6].Pretty(), addr)
 
 	return host, nil
 }

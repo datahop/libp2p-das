@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/libp2p/go-libp2p-core/host"
+	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/libp2p/go-libp2p-core/protocol"
 	"github.com/multiformats/go-multiaddr"
 )
@@ -74,9 +75,7 @@ func main() {
 	config := Config{}
 	stats := &Stats{}
 
-	var debugMode bool = false
-
-	flag.StringVar(&config.Rendezvous, "rendezvous", "/echo", "")
+	// flag.StringVar(&config.Rendezvous, "rendezvous", "/das", "")
 	flag.StringVar(&config.NodeType, "nodeType", "validator", "The node type to run (validator, nonvalidator, builder)")
 	flag.IntVar(&config.ParcelSize, "parcelSize", 512, "The size of the parcels to send - make sure 512 divides evenly into this number")
 	flag.Int64Var(&config.Seed, "seed", 0, "Seed value for generating a PeerID, 0 is random")
@@ -84,34 +83,60 @@ func main() {
 	flag.StringVar(&config.ProtocolID, "protocolid", "/p2p/rpc", "")
 	flag.IntVar(&config.Port, "port", 0, "")
 	flag.IntVar(&config.Duration, "duration", 30, "How long to run the test for (in seconds).")
-	flag.BoolVar(&debugMode, "debug", false, "Enable debug mode - see more messages about what is happening.")
 	flag.Parse()
 
 	nodeType := strings.ToLower(config.NodeType)
 
+	if nodeType != "builder" {
+		// ? Wait for a couple of seconds to make sure bootstrap peer is up and running
+		time.Sleep(5 * time.Second)
+	}
+
 	ctx, cancel := context.WithCancel(context.Background())
 
 	h, err := NewHost(ctx, config.Seed, config.Port)
-
 	if err != nil {
 		fmt.Printf("NewHost() failed\n")
 		log.Fatal(err)
 	}
 
-	// log.Print(colorize("Created Host ID: "+h.ID()[0:7].Pretty()+"\n", "white"))
+	log.Printf("[%s] Host created with ID: %s\n", h.ID()[:5].Pretty(), h.ID()[:5].Pretty())
 
-	// log.Printf("Connect to me on:")
-	// for _, addr := range h.Addrs() {
-	// 	log.Printf("  %s/p2p/%s", addr, h.ID().Pretty())
-	// }
-
-	dht, err := NewDHT(ctx, h, config.DiscoveryPeers, nodeType)
+	dht, err := NewDHT(ctx, h, nodeType)
 	if err != nil {
 		log.Printf("Error creating dht\n")
 		log.Fatal(err)
 	}
 
-	go Discover(ctx, h, dht, config.Rendezvous)
+	// ? Connect to bootstrap peers
+	if nodeType != "builder" {
+		for _, peerAddr := range config.DiscoveryPeers {
+			peerinfo, _ := peer.AddrInfoFromP2pAddr(peerAddr)
+
+			if err := h.Connect(ctx, *peerinfo); err != nil {
+				log.Print()
+				log.Printf("Error connecting to bootstrap node %q: %-v", peerinfo, err)
+				log.Printf("peerinfo: %s\n", peerinfo)
+				log.Printf("peerinfo.ID: %s\n", peerinfo.ID)
+				log.Printf("peerinfo.Addrs: %s\n", peerinfo.Addrs)
+				log.Printf("err: %s\n", err)
+				log.Print()
+			}
+		}
+	}
+
+	// peers, err := dht.GetClosestPeers(ctx, string(h.ID()))
+	// if err != nil {
+	// 	log.Printf("Error getting closest peers\n")
+	// 	log.Fatal(err)
+	// }
+	// log.Printf("Closest peers: %d\n", len(peers))
+
+	// TODO: Remove
+	cancel()
+	os.Exit(0)
+
+	// go Discover(ctx, h, dht, config.Rendezvous)
 
 	service := NewService(h, protocol.ID(config.ProtocolID))
 	err = service.SetupRPC()

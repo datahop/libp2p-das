@@ -169,7 +169,7 @@ func CopyEnvelopesToIfaces(in []*Envelope) []interface{} {
 func (s *Service) StartMessaging(dht *dht.IpfsDHT, stats *Stats, peerType string, parcelSize int, ctx context.Context) {
 
 	const RowCount = 512
-	const TotalBlocksCount = 10
+	const TotalBlocksCount = 3
 
 	if peerType == "builder" {
 

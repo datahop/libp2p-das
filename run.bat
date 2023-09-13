@@ -25,9 +25,9 @@ if not "%nodeType%"=="builder" (
 )
 
 if "%nodeType%"=="builder" (
-    go run . -debug -seed 1234 -port 61960 -nodeType builder -duration %duration% -parcelSize %parcelSize%
+    go run . -seed 1234 -port 61960 -nodeType builder -duration %duration% -parcelSize %parcelSize%
     exit /b
 ) else (
-    go run . -debug -duration %duration% -nodeType %nodeType% -peer /ip4/127.0.0.1/tcp/61960/p2p/12D3KooWE3AwZFT9zEWDUxhya62hmvEbRxYBWaosn7Kiqw5wsu73 -parcelSize %parcelSize%
+    go run . -duration %duration% -nodeType %nodeType% -peer /ip4/127.0.0.1/tcp/61960/p2p/12D3KooWE3AwZFT9zEWDUxhya62hmvEbRxYBWaosn7Kiqw5wsu73 -parcelSize %parcelSize%
     exit /b
 )
