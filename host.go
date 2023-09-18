@@ -5,7 +5,6 @@ import (
 	"crypto/rand"
 	"fmt"
 	"io"
-	"log"
 	mrand "math/rand"
 
 	"github.com/libp2p/go-libp2p"
@@ -40,8 +39,6 @@ func NewHost(ctx context.Context, seed int64, port int) (host.Host, error) {
 	if err != nil {
 		return nil, err
 	}
-
-	log.Printf("[%s] Listening on %s\n", host.ID()[0:6].Pretty(), addr)
 
 	return host, nil
 }
