@@ -13,6 +13,7 @@ import (
 
 	"github.com/libp2p/go-libp2p-core/host"
 	"github.com/libp2p/go-libp2p-core/peer"
+	"github.com/libp2p/go-libp2p-core/protocol"
 	"github.com/multiformats/go-multiaddr"
 )
 
@@ -25,7 +26,6 @@ type Config struct {
 	Seed           int64
 	DiscoveryPeers addrList
 	Debug          bool
-	Duration       int
 }
 
 type Stats struct {
@@ -72,7 +72,7 @@ type Stats struct {
 
 func main() {
 	config := Config{}
-	// stats := &Stats{}
+	stats := &Stats{}
 
 	// flag.StringVar(&config.Rendezvous, "rendezvous", "/das", "")
 	flag.StringVar(&config.NodeType, "nodeType", "validator", "The node type to run (validator, nonvalidator, builder)")
@@ -81,65 +81,73 @@ func main() {
 	flag.Var(&config.DiscoveryPeers, "peer", "Peer multiaddress for peer discovery")
 	flag.StringVar(&config.ProtocolID, "protocolid", "/p2p/rpc", "")
 	flag.IntVar(&config.Port, "port", 0, "")
-	flag.IntVar(&config.Duration, "duration", 30, "How long to run the test for (in seconds).")
 	flag.Parse()
 
 	nodeType := strings.ToLower(config.NodeType)
+	nodeTypeSuffix := ""
+
+	if nodeType == "builder" {
+		nodeTypeSuffix = "B"
+	} else if nodeType == "validator" {
+		nodeTypeSuffix = "V"
+	} else {
+		nodeTypeSuffix = "R"
+	}
 
 	h, err := NewHost(context.Background(), config.Seed, config.Port)
 	if err != nil {
 		log.Fatal(err)
 	}
 
+	dht, err := NewDHT(context.Background(), h, nodeType)
+	if err != nil {
+		log.Printf("Error creating dht\n")
+		log.Fatal(err)
+	}
+
 	var wg sync.WaitGroup
 	ctx, cancel := context.WithCancel(context.Background())
-
-	if nodeType != "builder" {
-
-		if nodeType == "validator" {
-			log.Printf("[V - %s] Peer ID: %s\n", h.ID().Pretty()[:5], h.ID().Pretty())
-		} else {
-			log.Printf("[R - %s] Peer ID: %s\n", h.ID().Pretty()[:5], h.ID().Pretty())
-		}
-
-		wg.Add(1)
-		go waitForBuilder(&wg, config.DiscoveryPeers, h)
-
-		// dht, err := NewDHT(ctx, h, nodeType)
-		// if err != nil {
-		// 	log.Printf("Error creating dht\n")
-		// 	log.Fatal(err)
-		// }
-
-		// peers, err := dht.GetClosestPeers(ctx, string(h.ID()))
-		// if err != nil {
-		// 	log.Printf("Error getting closest peers\n")
-		// 	log.Fatal(err)
-		// }
-		// log.Printf("Closest peers: %d\n", len(peers))
-	}
 
 	if nodeType == "builder" {
 		wg.Add(1)
 		go startBuilder(&wg, ctx, config.Seed, config.Port)
 
-		// dht, err := NewDHT(ctx, h, nodeType)
-		// if err != nil {
-		// 	log.Printf("Error creating dht\n")
-		// 	log.Fatal(err)
-		// }
+		service := NewService(h, protocol.ID(config.ProtocolID))
+		err = service.SetupRPC()
+		if err != nil {
+			log.Fatal(err)
+		}
 
-		// peers, err := dht.GetClosestPeers(ctx, string(h.ID()))
-		// if err != nil {
-		// 	log.Printf("Error getting closest peers\n")
-		// 	log.Fatal(err)
-		// }
-		// log.Printf("Closest peers: %d\n", len(peers))
+		service.StartMessaging(dht, stats, nodeType, config.ParcelSize, ctx)
 
+	} else {
+		log.Printf("[%s - %s] Peer ID: %s\n", nodeTypeSuffix, h.ID().Pretty()[:5], h.ID().Pretty())
+
+		wg.Add(1)
+		go waitForBuilder(&wg, config.DiscoveryPeers, h)
+
+		service := NewService(h, protocol.ID(config.ProtocolID))
+		err = service.SetupRPC()
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		service.StartMessaging(dht, stats, nodeType, config.ParcelSize, ctx)
+	}
+
+	if filename, err := writeTotalStatsToFile(stats, h, nodeType); err != nil {
+		log.Fatal(err)
+	} else {
+		log.Printf("[%s - %s] Total Stats written to %s\n", nodeTypeSuffix, h.ID()[0:5].Pretty(), filename)
+	}
+
+	if filename, err := writeLatencyStatsToFile(stats, h, nodeType); err != nil {
+		log.Fatal(err)
+	} else {
+		log.Printf("[%s - %s] Latencies written to %s\n", nodeTypeSuffix, h.ID()[0:5].Pretty(), filename)
 	}
 
 	wg.Wait()
-
 	cancel()
 
 	// if nodeType != "builder" {
@@ -207,20 +215,6 @@ func main() {
 	// }()
 
 	// <-timer.C
-
-	// if filename, err := writeTotalStatsToFile(stats, h, nodeType); err != nil {
-	// 	log.Fatal(err)
-	// } else {
-	// 	log.Printf("[%s] Total Stats written to %s\n", h.ID()[0:5].Pretty(), filename)
-	// }
-
-	// if filename, err := writeLatencyStatsToFile(stats, h, nodeType); err != nil {
-	// 	log.Fatal(err)
-	// } else {
-	// 	log.Printf("[%s] Latencies written to %s\n", h.ID()[0:5].Pretty(), filename)
-	// }
-
-	// cancel()
 
 	// if err := h.Close(); err != nil {
 	// 	panic(err)
@@ -373,7 +367,7 @@ func waitForBuilder(wg *sync.WaitGroup, discoveryPeers addrList, h host.Host) {
 			log.Printf("err: %s\n", err)
 			log.Print()
 		} else {
-			log.Printf("Connected to bootstrap node %q", peerinfo)
+			// log.Printf("[%s] Connected to bootstrap node %q", h.ID().Pretty()[:5], peerinfo)
 			return
 		}
 	}
