@@ -1,40 +1,35 @@
 #!/bin/bash
 
-# Remove existing CSV files
-rm -f *.csv
-
-# Set script parameters
-duration="$1"
-builderCount="$2"
-validatorCount="$3"
-nonValidatorCount="$4"
-parcelSize="$5"
-
-# Check if parameters are provided
-if [ -z "$duration" ] || [ -z "$builderCount" ] || [ -z "$validatorCount" ] || [ -z "$nonValidatorCount" ] || [ -z "$parcelSize" ]; then
-    echo "There should be 5 parameters: duration, builderCount, validatorCount, nonValidatorCount, and parcelSize. e.g. ./test.sh 30 1 2 1 512"
+if [ -z "$1" ] || [ -z "$2" ] || [ -z "$3" ] || [ -z "$4" ]; then
+    echo "There should be 4 parameters: builderCount, validatorCount, nonValidatorCount, and parcelSize. e.g. test.sh 1 2 1 512"
     exit 1
 fi
 
-# Convert builderCount and nonValidatorCount to integers
-builderCount=$((builderCount))
+builderCount=$1
+validatorCount=$2
+nonValidatorCount=$3
+parcelSize=$4
 
-# Check if builderCount is greater than 0
-if [ "$builderCount" -le 0 ]; then
+if [ $builderCount -le 0 ]; then
     echo "builderCount should be greater than 0."
     exit 1
 fi
 
-# Calculate nonBuilderCount
 nonBuilderCount=$((validatorCount + nonValidatorCount))
 
-# Check if the sum of validatorCount and nonValidatorCount is greater than 0
-if [ "$nonBuilderCount" -le 0 ]; then
+if [ $nonBuilderCount -le 0 ]; then
     echo "The sum of validatorCount and nonValidatorCount should be greater than 0."
     exit 1
 fi
 
-# Start processes in the background
-for ((i=1; i<=$nonBuilderCount; i++)); do
-    ./run_local.sh "$duration" "nonbuilder" "$parcelSize" &
+for ((i=1; i<=$builderCount; i++)); do
+    ./run_node.sh builder $parcelSize &
+done
+
+for ((i=1; i<=$validatorCount; i++)); do
+    ./run_node.sh validator $parcelSize &
+done
+
+for ((i=1; i<=$nonValidatorCount; i++)); do
+    ./run_node.sh nonvalidator $parcelSize &
 done
