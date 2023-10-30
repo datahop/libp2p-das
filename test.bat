@@ -8,16 +8,16 @@ set nonValidatorCount=%3
 set parcelSize=%4
 
 if "%builderCount%"=="" (
-    echo There should be 4 parameters: builderCount, validatorCount, nonValidatorCount, and parcelSize. e.g. test.bat 30 1 2 1 512
+    echo There should be 4 parameters: builderCount, validatorCount, nonValidatorCount, and parcelSize. e.g. test.bat 1 2 1 512
     exit /b
 ) else if "%validatorCount%"=="" (
-    echo There should be 4 parameters: builderCount, validatorCount, nonValidatorCount, and parcelSize. e.g. test.bat 30 1 2 1 512
+    echo There should be 4 parameters: builderCount, validatorCount, nonValidatorCount, and parcelSize. e.g. test.bat 1 2 1 512
     exit /b
 ) else if "%nonValidatorCount%"=="" (
-    echo There should be 4 parameters: builderCount, validatorCount, nonValidatorCount, and parcelSize. e.g. test.bat 30 1 2 1 512
+    echo There should be 4 parameters: builderCount, validatorCount, nonValidatorCount, and parcelSize. e.g. test.bat 1 2 1 512
     exit /b
 ) else if "%parcelSize%"=="" (
-    echo There should be 4 parameters: builderCount, validatorCount, nonValidatorCount, and parcelSize. e.g. test.bat 30 1 2 1 512
+    echo There should be 4 parameters: builderCount, validatorCount, nonValidatorCount, and parcelSize. e.g. test.bat 1 2 1 512
     exit /b
 )
 
