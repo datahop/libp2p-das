@@ -169,9 +169,15 @@ func CopyEnvelopesToIfaces(in []*Envelope) []interface{} {
 func (s *Service) StartMessaging(dht *dht.IpfsDHT, stats *Stats, peerType string, parcelSize int, ctx context.Context) {
 
 	const RowCount = 512
-	const TotalBlocksCount = 3
+	const TotalBlocksCount = 2
+	const TimeoutDuration = time.Minute / 3
 
 	if peerType == "builder" {
+
+		for len(dht.RoutingTable().ListPeers()) == 0 {
+			log.Printf("[B - %s] Waiting for peers to join...\n", s.host.ID()[0:5].Pretty())
+			time.Sleep(time.Second)
+		}
 
 		blockID := 0
 		for blockID < TotalBlocksCount {
@@ -184,9 +190,9 @@ func (s *Service) StartMessaging(dht *dht.IpfsDHT, stats *Stats, peerType string
 
 			parcels := SplitSamplesIntoParcels(RowCount, parcelSize, "all")
 
-			// ? Timeout after a minute
+			// ? Timeout after 20 seconds
 			// ? There are cases where all recipients have received all they need and leave the DHT (execution stops) - so there are no more peers in the DHT
-			ctx, cancel := context.WithTimeout(ctx, time.Minute)
+			ctx, cancel := context.WithTimeout(ctx, TimeoutDuration)
 			defer cancel()
 
 			for len(parcels) > 0 {
@@ -251,7 +257,7 @@ func (s *Service) StartMessaging(dht *dht.IpfsDHT, stats *Stats, peerType string
 
 		for blockID < TotalBlocksCount {
 
-			ctx, cancel := context.WithTimeout(ctx, time.Minute)
+			ctx, cancel := context.WithTimeout(ctx, TimeoutDuration)
 			defer cancel()
 
 			log.Printf("[V - %s] Starting to sample block %d...\n", s.host.ID()[0:5].Pretty(), blockID)
@@ -339,7 +345,7 @@ func (s *Service) StartMessaging(dht *dht.IpfsDHT, stats *Stats, peerType string
 
 		for blockID < TotalBlocksCount {
 
-			ctx, cancel := context.WithTimeout(ctx, time.Minute)
+			ctx, cancel := context.WithTimeout(ctx, TimeoutDuration)
 			defer cancel()
 
 			log.Printf("[R - %s] Starting to sample block %d...\n", s.host.ID()[0:5].Pretty(), blockID)
