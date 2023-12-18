@@ -2,9 +2,13 @@ package main
 
 import (
 	"context"
+	"crypto/rand"
 	"encoding/csv"
 	"flag"
+	"fmt"
+	"io"
 	"log"
+	mrand "math/rand"
 	"os"
 	"strconv"
 	"strings"
@@ -12,9 +16,14 @@ import (
 	"time"
 
 	dht "github.com/Blitz3r123/go-libp2p-kad-dht"
+	"github.com/libp2p/go-libp2p"
+	"github.com/libp2p/go-libp2p-core/crypto"
 	"github.com/libp2p/go-libp2p-core/host"
+	"github.com/libp2p/go-libp2p-core/network"
 	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/libp2p/go-libp2p-core/protocol"
+	discovery "github.com/libp2p/go-libp2p-discovery"
+	peerstore "github.com/libp2p/go-libp2p-peerstore"
 	"github.com/multiformats/go-multiaddr"
 )
 
@@ -53,31 +62,14 @@ type Stats struct {
 	GetHops []int
 }
 
-// func colorize(word string, colorName string) string {
-// 	var c *color.Color
-// 	switch colorName {
-// 	case "red":
-// 		c = color.New(color.FgRed)
-// 	case "green":
-// 		c = color.New(color.FgGreen)
-// 	case "yellow":
-// 		c = color.New(color.FgYellow)
-// 	case "blue":
-// 		c = color.New(color.FgBlue)
-// 	default:
-// 		c = color.New(color.Reset)
-// 	}
-
-// 	return c.Sprint(word)
-// }
+var config Config
 
 func main() {
-	config := Config{}
 	stats := &Stats{}
 
 	// flag.StringVar(&config.Rendezvous, "rendezvous", "/das", "")
 	flag.StringVar(&config.NodeType, "nodeType", "validator", "The node type to run (validator, nonvalidator, builder)")
-	flag.IntVar(&config.ParcelSize, "parcelSize", 512, "The size of the parcels to send - make sure 512 divides evenly into this number")
+	flag.IntVar(&config.ParcelSize, "parcelSize", 512, "The size of the parcels to send - make sure 512 divides evenly by this number")
 	flag.Int64Var(&config.Seed, "seed", 0, "Seed value for generating a PeerID, 0 is random")
 	flag.Var(&config.DiscoveryPeers, "peer", "Peer multiaddress for peer discovery")
 	flag.StringVar(&config.ProtocolID, "protocolid", "/p2p/rpc", "")
@@ -95,27 +87,90 @@ func main() {
 		nodeTypeSuffix = "R"
 	}
 
-	h, err := NewHost(context.Background(), config.Seed, config.Port)
+	// h, dht, err := NewHost(context.Background(), config.Seed, config.Port, nodeType)
+	// if err != nil {
+	// 	log.Fatal(err)
+	// }
+
+	var r io.Reader
+	var crypto_code int
+
+	if config.Seed == 0 {
+		r = rand.Reader
+		crypto_code = crypto.RSA
+	} else {
+		r = mrand.New(mrand.NewSource(config.Seed))
+		crypto_code = crypto.Ed25519
+	}
+
+	priv, _, err := crypto.GenerateKeyPairWithReader(crypto_code, 2048, r)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	addr, _ := multiaddr.NewMultiaddr(fmt.Sprintf("/ip4/127.0.0.1/tcp/%d", config.Port))
+
+	h, err := libp2p.New(
+		context.Background(),
+		libp2p.ListenAddrs(addr),
+		libp2p.Identity(priv),
+	)
 	if err != nil {
 		log.Fatal(err)
 	}
 
 	dht, err := NewDHT(context.Background(), h, nodeType)
 	if err != nil {
-		log.Printf("Error creating dht\n")
 		log.Fatal(err)
 	}
+
+	h.Peerstore().AddAddrs(dht.Host().ID(), dht.Host().Addrs(), peerstore.PermanentAddrTTL)
+	routingDiscovery := discovery.NewRoutingDiscovery(dht)
+	discovery.Advertise(context.Background(), routingDiscovery, "das")
+
+	// Register an event handler for peer connection
+	h.Network().Notify(&network.NotifyBundle{
+		ConnectedF: func(n network.Network, c network.Conn) {
+
+			if c.LocalPeer().String() == builder_id {
+				node_suffix := ""
+				if config.NodeType == "builder" {
+					node_suffix = "B"
+				} else if config.NodeType == "validator" {
+					node_suffix = "V"
+				} else {
+					node_suffix = "R"
+				}
+
+				remote_peer_id := c.RemotePeer()
+
+				routingTablePeerCountBefore := len(dht.RoutingTable().ListPeers())
+				dht.RoutingTable().TryAddPeer(remote_peer_id, false, false)
+				routingTablePeerCountAfter := len(dht.RoutingTable().ListPeers())
+
+				if routingTablePeerCountBefore == routingTablePeerCountAfter {
+					log.Printf("[%s - %s]: Failed to add peer %s to routing table\n", node_suffix, h.ID()[0:5].Pretty(), remote_peer_id[:5].Pretty())
+				} else {
+					log.Printf(
+						"[%s - %s]: Peer %s connected to builder (%d -> %d connections)\n",
+						node_suffix,
+						h.ID()[0:5].Pretty(),
+						remote_peer_id[:5].Pretty(),
+						routingTablePeerCountBefore,
+						routingTablePeerCountAfter,
+					)
+				}
+
+			}
+		},
+	})
 
 	var wg sync.WaitGroup
 	ctx, cancel := context.WithCancel(context.Background())
 
 	if nodeType == "builder" {
 
-		wg.Add(1)
-		go startBuilder(&wg, ctx, config.Seed, config.Port)
-		wg.Wait()
-
-		log.Printf("[%s - %s] Builder started: %s\n", nodeTypeSuffix, h.ID().Pretty()[:5], h.ID().Pretty())
+		log.Printf("[B - %s] Builder started: %s\n", h.ID().Pretty()[:5], h.ID().Pretty())
 
 	} else {
 
@@ -123,7 +178,7 @@ func main() {
 		go waitForBuilder(&wg, config.DiscoveryPeers, h, dht)
 		wg.Wait()
 
-		log.Printf("[%s - %s] Peer started: %s\n", nodeTypeSuffix, h.ID().Pretty()[:5], h.ID().Pretty())
+		log.Printf("[%s - %s] Peer started: %s\n", nodeTypeSuffix, h.ID().Pretty()[:5], h.ID().Pretty()[:5])
 
 	}
 
@@ -133,7 +188,7 @@ func main() {
 		log.Fatal(err)
 	}
 
-	service.StartMessaging(dht, stats, nodeType, config.ParcelSize, ctx)
+	service.StartMessaging(h, dht, stats, nodeType, config.ParcelSize, ctx)
 
 	if filename, err := writeTotalStatsToFile(stats, h, nodeType); err != nil {
 		log.Fatal(err)
@@ -147,79 +202,7 @@ func main() {
 		log.Printf("[%s - %s] Latencies written to %s\n", nodeTypeSuffix, h.ID()[0:5].Pretty(), filename)
 	}
 
-	// wg.Wait()
 	cancel()
-
-	// if nodeType != "builder" {
-	// 	// ? Wait for a couple of seconds to make sure bootstrap peer is up and running
-	// 	time.Sleep(5 * time.Second)
-	// }
-
-	// ctx, cancel := context.WithCancel(context.Background())
-
-	// h, err := NewHost(ctx, config.Seed, config.Port)
-	// if err != nil {
-	// 	fmt.Printf("NewHost() failed\n")
-	// 	log.Fatal(err)
-	// }
-
-	// if nodeType == "builder" {
-	// 	log.Printf("[%s] Peer ID: %s\n", h.ID().Pretty()[:5], h.ID().Pretty())
-	// }
-
-	// log.Printf("[%s] %s Host created with ID: %s\n", h.ID()[:5].Pretty(), nodeType, h.ID()[:5].Pretty())
-
-	// dht, err := NewDHT(ctx, h, nodeType)
-	// if err != nil {
-	// 	log.Printf("Error creating dht\n")
-	// 	log.Fatal(err)
-	// }
-
-	// // ? Connect to bootstrap peers
-	// if nodeType != "builder" {
-	// 	for _, peerAddr := range config.DiscoveryPeers {
-	// 		peerinfo, _ := peer.AddrInfoFromP2pAddr(peerAddr)
-
-	// 		if err := h.Connect(ctx, *peerinfo); err != nil {
-	// 			log.Print()
-	// 			log.Printf("Error connecting to bootstrap node %q: %-v", peerinfo, err)
-	// 			log.Printf("peerinfo: %s\n", peerinfo)
-	// 			log.Printf("peerinfo.ID: %s\n", peerinfo.ID)
-	// 			log.Printf("peerinfo.Addrs: %s\n", peerinfo.Addrs)
-	// 			log.Printf("err: %s\n", err)
-	// 			log.Print()
-	// 		}
-	// 	}
-	// }
-
-	// peers, err := dht.GetClosestPeers(ctx, string(h.ID()))
-	// if err != nil {
-	// 	log.Printf("Error getting closest peers\n")
-	// 	log.Fatal(err)
-	// }
-	// log.Printf("Closest peers: %d\n", len(peers))
-
-	// go Discover(ctx, h, dht, config.Rendezvous)
-
-	// service := NewService(h, protocol.ID(config.ProtocolID))
-	// err = service.SetupRPC()
-	// if err != nil {
-	// 	log.Fatal(err)
-	// }
-
-	// // ? Create a timer that runs for x seconds
-	// timer := time.NewTimer(time.Duration(config.Duration) * time.Second)
-
-	// go func() {
-	// 	service.StartMessaging(dht, stats, nodeType, config.ParcelSize, ctx)
-	// }()
-
-	// <-timer.C
-
-	// if err := h.Close(); err != nil {
-	// 	panic(err)
-	// }
-	// os.Exit(0)
 
 }
 
@@ -348,7 +331,7 @@ func waitForBuilder(wg *sync.WaitGroup, discoveryPeers addrList, h host.Host, dh
 	defer wg.Done()
 
 	// ? Wait for a couple of seconds to make sure bootstrap peer is up and running
-	time.Sleep(5 * time.Second)
+	time.Sleep(2 * time.Second)
 
 	// ? Timeout of 10 seconds to connect to bootstrap peer
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
@@ -370,13 +353,12 @@ func waitForBuilder(wg *sync.WaitGroup, discoveryPeers addrList, h host.Host, dh
 
 		} else {
 
-			log.Printf("[%s] Connected to bootstrap node %q", h.ID().Pretty()[:5], peerinfo)
+			if _, err := dht.FindPeer(ctx, peerinfo.ID); err != nil {
 
-			// ? Force add bootstrap peer to routing table
-			if _, err := dht.RoutingTable().TryAddPeer(peerinfo.ID, true, true); err != nil {
-				log.Printf("Error adding bootstrap peer to routing table: %s\n", err)
+				log.Printf("Error finding peer: %s\n", err)
+
 			} else {
-				// log.Printf("[%s] Added bootstrap node %q to routing table", h.ID().Pretty()[:5], peerinfo)
+
 				return
 			}
 
@@ -387,14 +369,35 @@ func waitForBuilder(wg *sync.WaitGroup, discoveryPeers addrList, h host.Host, dh
 
 }
 
-func startBuilder(wg *sync.WaitGroup, ctx context.Context, seed int64, port int) {
-	defer wg.Done()
+// func onPeerConnected(h host.Host, remote_peer_id peer.ID, dht *dht.IpfsDHT) (returningDht *dht.IpfsDHT) {
 
-	h, err := NewHost(ctx, seed, port)
-	if err != nil {
-		log.Fatal(err)
-	}
+// 	node_suffix := ""
+// 	if config.NodeType == "builder" {
+// 		node_suffix = "B"
+// 	} else if config.NodeType == "validator" {
+// 		node_suffix = "V"
+// 	} else {
+// 		node_suffix = "R"
+// 	}
 
-	log.Printf("[B - %s] Builder created with ID: %s\n", h.ID().Pretty()[:5], h.ID().Pretty())
+// 	routingTablePeerCountBefore := len(dht.RoutingTable().ListPeers())
+// 	dht.RoutingTable().TryAddPeer(remote_peer_id, false, false)
+// 	routingTablePeerCountAfter := len(dht.RoutingTable().ListPeers())
 
-}
+// 	if routingTablePeerCountBefore == routingTablePeerCountAfter {
+// 		log.Printf("[%s - %s]: Failed to add peer %s to routing table\n", node_suffix, h.ID()[0:5].Pretty(), remote_peer_id[:5].Pretty())
+// 		return
+// 	}
+
+// 	log.Printf(
+// 		"[%s - %s]: Peer %s connected to builder (%d -> %d connections)\n",
+// 		node_suffix,
+// 		h.ID()[0:5].Pretty(),
+// 		remote_peer_id[:5].Pretty(),
+// 		routingTablePeerCountBefore,
+// 		routingTablePeerCountAfter,
+// 	)
+
+// 	return dht
+
+// }

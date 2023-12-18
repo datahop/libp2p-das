@@ -166,10 +166,10 @@ func CopyEnvelopesToIfaces(in []*Envelope) []interface{} {
 	return ifaces
 }
 
-func (s *Service) StartMessaging(dht *dht.IpfsDHT, stats *Stats, peerType string, parcelSize int, ctx context.Context) {
+func (s *Service) StartMessaging(h host.Host, dht *dht.IpfsDHT, stats *Stats, peerType string, parcelSize int, ctx context.Context) {
 
 	const RowCount = 512
-	const TotalBlocksCount = 2
+	const TotalBlocksCount = 10
 	const TimeoutDuration = time.Minute / 3
 
 	if peerType == "builder" {
