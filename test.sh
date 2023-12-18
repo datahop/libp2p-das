@@ -1,5 +1,9 @@
 #!/bin/bash
 
+rm -rf ./*_builder.csv
+rm -rf ./*_validator.csv
+rm -rf ./*_nonvalidator.csv
+
 if [ -z "$1" ] || [ -z "$2" ] || [ -z "$3" ] || [ -z "$4" ]; then
     echo "There should be 4 parameters: builderCount, validatorCount, nonValidatorCount, and parcelSize. e.g. test.sh 1 2 1 512"
     exit 1
@@ -22,14 +26,29 @@ if [ $nonBuilderCount -le 0 ]; then
     exit 1
 fi
 
+# Create an array to store background process IDs
+declare -a bg_pids
+
+trap 'echo "Stopping all processes"; pkill -P $$; exit 1' SIGINT
+
 for ((i=1; i<=$builderCount; i++)); do
     ./run_node.sh builder $parcelSize &
+    bg_pids+=($!)  # Store the background process ID in the array
 done
 
 for ((i=1; i<=$validatorCount; i++)); do
     ./run_node.sh validator $parcelSize &
+    bg_pids+=($!)
 done
 
 for ((i=1; i<=$nonValidatorCount; i++)); do
     ./run_node.sh nonvalidator $parcelSize &
+    bg_pids+=($!)
 done
+
+# Wait for all background processes to finish
+for pid in "${bg_pids[@]}"; do
+    wait $pid
+done
+
+echo "All processes have finished."
