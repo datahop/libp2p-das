@@ -4,7 +4,7 @@ nodeType=$1
 parcelSize=$2
 
 if [ -z "$nodeType" ] || [ -z "$parcelSize" ]; then
-    echo "There should be 2 parameters: nodeType, and parcelSize. e.g. run.sh builder 256"
+    echo "There should be 2 parameters: nodeType, and parcelSize. e.g. run_node.sh builder 256"
     exit 1
 fi
 
