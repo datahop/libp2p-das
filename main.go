@@ -7,6 +7,7 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"log"
 	mrand "math/rand"
 	"os"
@@ -65,6 +66,9 @@ type Stats struct {
 var config Config
 
 func main() {
+	// Turn on/off logging messages in stdout
+	log.SetOutput(ioutil.Discard)
+
 	stats := &Stats{}
 
 	// flag.StringVar(&config.Rendezvous, "rendezvous", "/das", "")
