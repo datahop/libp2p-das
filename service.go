@@ -191,29 +191,16 @@ func (s *Service) StartMessaging(h host.Host, dht *dht.IpfsDHT, stats *Stats, pe
 
 			parcels := SplitSamplesIntoParcels(RowCount, parcelSize, "all")
 
-<<<<<<< HEAD
-			var wg sync.WaitGroup
-			// ? Add a mutex to synchronize access to shared variables
-			var mu sync.Mutex
-=======
 			// ? Timeout after 20 seconds
 			// ? There are cases where all recipients have received all they need and leave the DHT (execution stops) - so there are no more peers in the DHT
 			ctx, cancel := context.WithTimeout(ctx, TimeoutDuration)
 			defer cancel()
 
->>>>>>> discovery_removal
 			for len(parcels) > 0 {
 				wg.Add(1)
 				go func() {
 					defer wg.Done()
 
-<<<<<<< HEAD
-					mu.Lock()
-					randomIndex := 0
-					if len(parcels) > 1 {
-						randomIndex = rand.Intn(len(parcels) - 1)
-					}
-=======
 				if ctx.Err() != nil {
 					log.Printf("[B - B%d] Seeding timed out after %.2f seconds.\n", blockID, time.Since(seedingTime).Seconds())
 
@@ -228,7 +215,6 @@ func (s *Service) StartMessaging(h host.Host, dht *dht.IpfsDHT, stats *Stats, pe
 				if len(parcels) > 1 {
 					randomIndex = rand.Intn(len(parcels) - 1)
 				}
->>>>>>> discovery_removal
 
 					randomParcel := parcels[randomIndex]
 					mu.Unlock()
@@ -247,22 +233,6 @@ func (s *Service) StartMessaging(h host.Host, dht *dht.IpfsDHT, stats *Stats, pe
 						parcelSamplesToSend,
 					)
 
-<<<<<<< HEAD
-					if putErr != nil {
-						mu.Lock()
-						stats.TotalFailedPuts += 1
-						stats.TotalPutMessages += 1
-						mu.Unlock()
-					} else {
-						mu.Lock()
-						stats.PutLatencies = append(stats.PutLatencies, time.Since(putStartTime))
-						stats.TotalPutMessages += 1
-						if randomIndex >= 0 && randomIndex < len(parcels) {
-							parcels = append(parcels[:randomIndex], parcels[randomIndex+1:]...)
-						}
-						mu.Unlock()
-					}
-=======
 				if putErr != nil {
 					stats.TotalFailedPuts += 1
 					stats.TotalPutMessages += 1
@@ -278,7 +248,6 @@ func (s *Service) StartMessaging(h host.Host, dht *dht.IpfsDHT, stats *Stats, pe
 					stats.SeedingLatencies = append(stats.SeedingLatencies, time.Since(seedingTime))
 					log.Printf("[B - B%d] Seeding took %.2f seconds.\n", blockID, time.Since(seedingTime).Seconds())
 				}
->>>>>>> discovery_removal
 
 					if len(parcels) == 0 {
 						mu.Lock()
@@ -326,10 +295,6 @@ func (s *Service) StartMessaging(h host.Host, dht *dht.IpfsDHT, stats *Stats, pe
 			allRandomParcels := append(randomRowParcels, randomColParcels...)
 			allRandomParcels = append(allRandomParcels, randomParcels...)
 
-<<<<<<< HEAD
-			wg := sync.WaitGroup{}
-			wg.Add(len(allRandomParcels))
-=======
 			for len(allRandomParcels) > 0 {
 
 				if ctx.Err() != nil {
@@ -341,7 +306,6 @@ func (s *Service) StartMessaging(h host.Host, dht *dht.IpfsDHT, stats *Stats, pe
 				if len(allRandomParcels) > 1 {
 					randomIndex = rand.Intn(len(allRandomParcels))
 				}
->>>>>>> discovery_removal
 
 			var mu sync.Mutex
 
@@ -420,10 +384,6 @@ func (s *Service) StartMessaging(h host.Host, dht *dht.IpfsDHT, stats *Stats, pe
 
 			randomParcels := pickRandomParcels(allParcels, randomParcelsNeededCount)
 
-<<<<<<< HEAD
-			wg := sync.WaitGroup{}
-			wg.Add(len(randomParcels))
-=======
 			for len(randomParcels) > 0 {
 
 				if ctx.Err() != nil {
@@ -435,7 +395,6 @@ func (s *Service) StartMessaging(h host.Host, dht *dht.IpfsDHT, stats *Stats, pe
 				if len(randomParcels) > 1 {
 					randomIndex = rand.Intn(len(randomParcels))
 				}
->>>>>>> discovery_removal
 
 			var mu sync.Mutex
 
@@ -443,11 +402,6 @@ func (s *Service) StartMessaging(h host.Host, dht *dht.IpfsDHT, stats *Stats, pe
 				go func(randomParcel Parcel) {
 					defer wg.Done()
 
-<<<<<<< HEAD
-					parcelType := "row"
-					if !randomParcel.IsRow {
-						parcelType = "col"
-=======
 				getStartTime := time.Now()
 				_, hops, err := dht.GetValueHops(
 					ctx,
@@ -468,7 +422,6 @@ func (s *Service) StartMessaging(h host.Host, dht *dht.IpfsDHT, stats *Stats, pe
 					if len(randomParcels) == 0 && randomSamplingDurationMicrosec == 0 {
 						randomSamplingDurationMicrosec = time.Since(startTime).Microseconds()
 						stats.RandomSamplingLatencies = append(stats.RandomSamplingLatencies, time.Since(startTime))
->>>>>>> discovery_removal
 					}
 
 					getStartTime := time.Now()
