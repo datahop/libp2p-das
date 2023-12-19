@@ -170,7 +170,7 @@ func (s *Service) StartMessaging(h host.Host, dht *dht.IpfsDHT, stats *Stats, pe
 
 	const RowCount = 512
 	const TotalBlocksCount = 5
-	const TimeoutDuration = time.Minute / 3
+	const TimeoutDuration = time.Minute * 2
 
 	if peerType == "builder" {
 
