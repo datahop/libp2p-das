@@ -335,6 +335,8 @@ func (s *Service) StartMessaging(h host.Host, dht *dht.IpfsDHT, stats *Stats, pe
 			if len(allRandomParcels) == 0 {
 				log.Printf("[V - B%d] All Sampling took %.2f seconds.\n", blockID, time.Since(startTime).Seconds())
 
+				stats.TotalSamplingLatencies = append(stats.TotalSamplingLatencies, time.Since(startTime))
+
 				blockID += 1
 			}
 		}
@@ -406,6 +408,9 @@ func (s *Service) StartMessaging(h host.Host, dht *dht.IpfsDHT, stats *Stats, pe
 
 			if len(randomParcels) == 0 {
 				log.Printf("[R - B%d] All Sampling took %.2f seconds.\n", blockID, time.Since(startTime).Seconds())
+
+				stats.TotalSamplingLatencies = append(stats.TotalSamplingLatencies, time.Since(startTime))
+
 				blockID += 1
 			}
 		}

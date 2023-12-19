@@ -7,7 +7,6 @@ import (
 	"flag"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"log"
 	mrand "math/rand"
 	"os"
@@ -59,6 +58,8 @@ type Stats struct {
 	ColSamplingLatencies []time.Duration
 	// ? How long it takes to get 75 random cells
 	RandomSamplingLatencies []time.Duration
+	// ? How long it took to sample everything
+	TotalSamplingLatencies []time.Duration
 	// ? Array of hops for gets
 	GetHops []int
 }
@@ -67,7 +68,8 @@ var config Config
 
 func main() {
 	// Turn on/off logging messages in stdout
-	log.SetOutput(ioutil.Discard)
+	// log.SetOutput(ioutil.Discard)
+	log.SetOutput(os.Stdout)
 
 	stats := &Stats{}
 
@@ -242,7 +244,7 @@ func writeLatencyStatsToFile(stats *Stats, h host.Host, nodeType string) (string
 
 	// Convert latencies and hops to rows
 	var latencyRows [][]string
-	for i := 0; i < len(stats.SeedingLatencies) || i < len(stats.PutLatencies) || i < len(stats.GetLatencies) || i < len(stats.GetHops); i++ {
+	for i := 0; i < len(stats.SeedingLatencies) || i < len(stats.PutLatencies) || i < len(stats.GetLatencies) || i < len(stats.GetHops) || i < len(stats.TotalSamplingLatencies); i++ {
 		var row []string
 
 		if i < len(stats.SeedingLatencies) {
@@ -281,6 +283,12 @@ func writeLatencyStatsToFile(stats *Stats, h host.Host, nodeType string) (string
 			row = append(row, "")
 		}
 
+		if i < len(stats.TotalSamplingLatencies) {
+			row = append(row, strconv.FormatInt(stats.TotalSamplingLatencies[i].Microseconds(), 10))
+		} else {
+			row = append(row, "")
+		}
+
 		if i < len(stats.GetHops) {
 			row = append(row, strconv.Itoa(stats.GetHops[i]))
 		} else {
@@ -299,7 +307,7 @@ func writeLatencyStatsToFile(stats *Stats, h host.Host, nodeType string) (string
 	w := csv.NewWriter(f)
 	defer w.Flush()
 
-	headers := []string{"Block Seeding Duration (us)", "PUT latencies (us)", "GET latencies (us)", "Row Sampling Latencies (us)", "Col Sampling Latencies (us)", "Random Sampling Latencies (us)", "GET hops"}
+	headers := []string{"Block Seeding Duration (us)", "PUT latencies (us)", "GET latencies (us)", "Row Sampling Latencies (us)", "Col Sampling Latencies (us)", "Random Sampling Latencies (us)", "Total Sampling Latencies (us)", "GET hops"}
 	rows := latencyRows
 
 	// Write headers and rows to CSV file
