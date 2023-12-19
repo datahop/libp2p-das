@@ -1,20 +1,21 @@
 #!/bin/bash
 
 # Script parameters: 
-# $1=duration
-# $2=experiment_name
-# $3=builder count
-# $4=validator count
-# $5=non validator count
+# $1 = experiment_name
+# $2 = builder count
+# $3 = validator count
+# $4 = non validator count
+# $5 = login
+# $6 = builder ip
+# $7 = parcel size
 
-exp_duration=$1
-experiment_name=$2
-builder_count=$3
-validator_count=$4
-non_validator_count=$5
-login=$6
-builder_ip=$7
-parcel_size=$8
+experiment_name=$1
+builder_count=$2
+validator_count=$3
+non_validator_count=$4
+login=$5
+builder_ip=$6
+parcel_size=$7
 
 result_dir="/home/${login}/results"
 finish_time=$(date +%d-%m-%y-%H-%M)
@@ -47,17 +48,17 @@ sleep 1
 for ((i=0; i<$builder_count-1; i++))
 do
     echo "[BACKGROUND] Running builder $i"
-    go run . -debug -seed 1234 -port 61960 -nodeType builder -parcelSize $parcel_size -duration $exp_duration &
+    go run . -seed 1234 -port 61960 -nodeType builder -parcelSize $parcel_size &
     sleep 1
 done
 if [ $(($builder_count)) -ne 0 ]; then
     if [ $(($non_validator_count)) -eq 0 ] && [ $(($validator_count)) -eq 0 ]; then
         echo "[FOREGROUND] Running builder [0]"
 
-        go run . -debug -seed 1234 -port 61960 -nodeType builder -parcelSize $parcel_size -duration $exp_duration
+        go run . -seed 1234 -port 61960 -nodeType builder -parcelSize $parcel_size
         sleep 1
     else
-        go run . -debug -seed 1234 -port 61960 -nodeType builder -parcelSize $parcel_size -duration $exp_duration &
+        go run . -seed 1234 -port 61960 -nodeType builder -parcelSize $parcel_size &
         sleep 1
     fi;
 fi;
@@ -66,31 +67,31 @@ fi;
 for ((i=0; i<$validator_count - 1; i++))
 do
     echo "[BACKGROUND] Running validator $i"
-    go run . -debug -duration $exp_duration -nodeType validator -parcelSize $parcel_size -peer /ip4/$builder_ip/tcp/61960/p2p/12D3KooWE3AwZFT9zEWDUxhya62hmvEbRxYBWaosn7Kiqw5wsu73 &
+    go run . -nodeType validator -parcelSize $parcel_size -peer /ip4/$builder_ip/tcp/61960/p2p/12D3KooWE3AwZFT9zEWDUxhya62hmvEbRxYBWaosn7Kiqw5wsu73 &
 done
 
 if [ $(($non_validator_count)) -eq 0 ]
 then
     if [ $(($validator_count)) -ne 0 ]; then
         echo "[FOREGROUND] Running validator $i"
-        go run . -debug -duration $exp_duration -nodeType validator -parcelSize $parcel_size -peer /ip4/$builder_ip/tcp/61960/p2p/12D3KooWE3AwZFT9zEWDUxhya62hmvEbRxYBWaosn7Kiqw5wsu73
+        go run . -nodeType validator -parcelSize $parcel_size -peer /ip4/$builder_ip/tcp/61960/p2p/12D3KooWE3AwZFT9zEWDUxhya62hmvEbRxYBWaosn7Kiqw5wsu73
         sleep 1
     fi;
 else
     echo "[BACKGROUND] Running validator $i"
-    go run . -debug -duration $exp_duration -nodeType validator -parcelSize $parcel_size -peer /ip4/$builder_ip/tcp/61960/p2p/12D3KooWE3AwZFT9zEWDUxhya62hmvEbRxYBWaosn7Kiqw5wsu73 &
+    go run . -nodeType validator -parcelSize $parcel_size -peer /ip4/$builder_ip/tcp/61960/p2p/12D3KooWE3AwZFT9zEWDUxhya62hmvEbRxYBWaosn7Kiqw5wsu73 &
 fi
 
 # Run non validators
 for ((i=0; i<$non_validator_count - 1; i++))
 do
     echo "[BACKGROUND] Running non validator $i"
-    go run . -debug -duration $exp_duration -nodeType nonvalidator -parcelSize $parcel_size -peer /ip4/$builder_ip/tcp/61960/p2p/12D3KooWE3AwZFT9zEWDUxhya62hmvEbRxYBWaosn7Kiqw5wsu73 &
+    go run . -nodeType nonvalidator -parcelSize $parcel_size -peer /ip4/$builder_ip/tcp/61960/p2p/12D3KooWE3AwZFT9zEWDUxhya62hmvEbRxYBWaosn7Kiqw5wsu73 &
 done
 
 if [ $(($non_validator_count)) -ne 0 ]; then
     echo "[FOREGROUND] Running non validator $i"
-    go run . -debug -duration $exp_duration -nodeType nonvalidator -parcelSize $parcel_size -peer /ip4/$builder_ip/tcp/61960/p2p/12D3KooWE3AwZFT9zEWDUxhya62hmvEbRxYBWaosn7Kiqw5wsu73
+    go run . -nodeType nonvalidator -parcelSize $parcel_size -peer /ip4/$builder_ip/tcp/61960/p2p/12D3KooWE3AwZFT9zEWDUxhya62hmvEbRxYBWaosn7Kiqw5wsu73
     sleep 1
 fi;
 

@@ -2,26 +2,22 @@
 
 del *.csv
 
-set duration=%1
-set builderCount=%2
-set validatorCount=%3
-set nonValidatorCount=%4
-set parcelSize=%5
+set builderCount=%1
+set validatorCount=%2
+set nonValidatorCount=%3
+set parcelSize=%4
 
-if "%duration%"=="" (
-    echo There should be 5 parameters: duration, builderCount, validatorCount, nonValidatorCount, and parcelSize. e.g. test.bat 30 1 2 1 512
-    exit /b
-) else if "%builderCount%"=="" (
-    echo There should be 5 parameters: duration, builderCount, validatorCount, nonValidatorCount, and parcelSize. e.g. test.bat 30 1 2 1 512
+if "%builderCount%"=="" (
+    echo There should be 4 parameters: builderCount, validatorCount, nonValidatorCount, and parcelSize. e.g. test.bat 1 2 1 512
     exit /b
 ) else if "%validatorCount%"=="" (
-    echo There should be 5 parameters: duration, builderCount, validatorCount, nonValidatorCount, and parcelSize. e.g. test.bat 30 1 2 1 512
+    echo There should be 4 parameters: builderCount, validatorCount, nonValidatorCount, and parcelSize. e.g. test.bat 1 2 1 512
     exit /b
 ) else if "%nonValidatorCount%"=="" (
-    echo There should be 5 parameters: duration, builderCount, validatorCount, nonValidatorCount, and parcelSize. e.g. test.bat 30 1 2 1 512
+    echo There should be 4 parameters: builderCount, validatorCount, nonValidatorCount, and parcelSize. e.g. test.bat 1 2 1 512
     exit /b
 ) else if "%parcelSize%"=="" (
-    echo There should be 5 parameters: duration, builderCount, validatorCount, nonValidatorCount, and parcelSize. e.g. test.bat 30 1 2 1 512
+    echo There should be 4 parameters: builderCount, validatorCount, nonValidatorCount, and parcelSize. e.g. test.bat 1 2 1 512
     exit /b
 )
 
@@ -39,13 +35,13 @@ if %nonBuilderCount% leq 0 (
 )
 
 for /L %%i in (1,1,%builderCount%) do (
-    start /B "" run.bat %duration% builder %parcelSize%
+    start /B "" run.bat builder %parcelSize%
 )
 
 for /L %%i in (1,1,%validatorCount%) do (
-    start /B "" run.bat %duration% validator %parcelSize%
+    start /B "" run.bat validator %parcelSize%
 )
 
 for /L %%i in (1,1,%nonValidatorCount%) do (
-    start /B "" run.bat %duration% nonvalidator %parcelSize%
+    start /B "" run.bat nonvalidator %parcelSize%
 )

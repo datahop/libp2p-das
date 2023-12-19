@@ -167,37 +167,23 @@ func CopyEnvelopesToIfaces(in []*Envelope) []interface{} {
 	return ifaces
 }
 
-func (s *Service) StartMessaging(dht *dht.IpfsDHT, stats *Stats, peerType string, parcelSize int, ctx context.Context) {
+func (s *Service) StartMessaging(h host.Host, dht *dht.IpfsDHT, stats *Stats, peerType string, parcelSize int, ctx context.Context) {
 
 	const RowCount = 512
-	const TotalBlocksCount = 10
+	const TotalBlocksCount = 5
+	const TimeoutDuration = time.Minute * 2
 
 	if peerType == "builder" {
 
-		peerName := "[BUILDER\t\t" + s.host.ID()[0:5].Pretty() + "]"
+		for len(dht.RoutingTable().ListPeers()) == 0 {
+			log.Printf("[B - %s] Waiting for peers to join...\n", s.host.ID()[0:5].Pretty())
+			time.Sleep(time.Second)
+		}
 
 		blockID := 0
 		for blockID < TotalBlocksCount {
 
-			// ! Network setup
-
-			peers := FilterSelf(s.host.Peerstore().Peers(), s.host.ID())
-			dhtPeers := FilterSelf(dht.RoutingTable().ListPeers(), s.host.ID())
-
-			// ? No peers found, skip
-			if len(peers) == 0 && len(dhtPeers) == 0 {
-				continue
-			}
-
-			// ? Manually add peers to routing table
-			if len(peers) == 0 || len(dhtPeers) == 0 {
-				for _, p := range peers {
-					_, err := dht.RoutingTable().TryAddPeer(p, false, true)
-					if err != nil {
-						log.Printf("Failed to add peer %s : %s\n", p[0:5].Pretty(), err.Error())
-					}
-				}
-			}
+			log.Printf("[B - %s] Starting to seed block %d...\n", s.host.ID()[0:5].Pretty(), blockID)
 
 			// ! Seeding
 
@@ -205,19 +191,44 @@ func (s *Service) StartMessaging(dht *dht.IpfsDHT, stats *Stats, peerType string
 
 			parcels := SplitSamplesIntoParcels(RowCount, parcelSize, "all")
 
+<<<<<<< HEAD
 			var wg sync.WaitGroup
 			// ? Add a mutex to synchronize access to shared variables
 			var mu sync.Mutex
+=======
+			// ? Timeout after 20 seconds
+			// ? There are cases where all recipients have received all they need and leave the DHT (execution stops) - so there are no more peers in the DHT
+			ctx, cancel := context.WithTimeout(ctx, TimeoutDuration)
+			defer cancel()
+
+>>>>>>> discovery_removal
 			for len(parcels) > 0 {
 				wg.Add(1)
 				go func() {
 					defer wg.Done()
 
+<<<<<<< HEAD
 					mu.Lock()
 					randomIndex := 0
 					if len(parcels) > 1 {
 						randomIndex = rand.Intn(len(parcels) - 1)
 					}
+=======
+				if ctx.Err() != nil {
+					log.Printf("[B - B%d] Seeding timed out after %.2f seconds.\n", blockID, time.Since(seedingTime).Seconds())
+
+					if blockID == TotalBlocksCount-1 {
+						return
+					} else {
+						break
+					}
+				}
+
+				randomIndex := 0
+				if len(parcels) > 1 {
+					randomIndex = rand.Intn(len(parcels) - 1)
+				}
+>>>>>>> discovery_removal
 
 					randomParcel := parcels[randomIndex]
 					mu.Unlock()
@@ -236,6 +247,7 @@ func (s *Service) StartMessaging(dht *dht.IpfsDHT, stats *Stats, peerType string
 						parcelSamplesToSend,
 					)
 
+<<<<<<< HEAD
 					if putErr != nil {
 						mu.Lock()
 						stats.TotalFailedPuts += 1
@@ -250,6 +262,23 @@ func (s *Service) StartMessaging(dht *dht.IpfsDHT, stats *Stats, peerType string
 						}
 						mu.Unlock()
 					}
+=======
+				if putErr != nil {
+					stats.TotalFailedPuts += 1
+					stats.TotalPutMessages += 1
+				} else {
+					stats.PutLatencies = append(stats.PutLatencies, time.Since(putStartTime))
+					stats.TotalPutMessages += 1
+
+					parcels = append(parcels[:randomIndex], parcels[randomIndex+1:]...)
+
+				}
+
+				if len(parcels) == 0 {
+					stats.SeedingLatencies = append(stats.SeedingLatencies, time.Since(seedingTime))
+					log.Printf("[B - B%d] Seeding took %.2f seconds.\n", blockID, time.Since(seedingTime).Seconds())
+				}
+>>>>>>> discovery_removal
 
 					if len(parcels) == 0 {
 						mu.Lock()
@@ -266,13 +295,19 @@ func (s *Service) StartMessaging(dht *dht.IpfsDHT, stats *Stats, peerType string
 
 		}
 
-	} else if peerType == "validator" {
+		log.Printf("[B - %s] Finished seeding all blocks.\n", s.host.ID()[0:5].Pretty())
 
-		peerName := "[VALIDATOR\t\t" + s.host.ID()[0:5].Pretty() + "]"
+	} else if peerType == "validator" {
 
 		blockID := 0
 
 		for blockID < TotalBlocksCount {
+
+			ctx, cancel := context.WithTimeout(ctx, TimeoutDuration)
+			defer cancel()
+
+			log.Printf("[V - %s] Starting to sample block %d...\n", s.host.ID()[0:5].Pretty(), blockID)
+
 			startTime := time.Now()
 			rowSamplingDurationMicrosec := int64(0)
 			colSamplingDurationMicrosec := int64(0)
@@ -291,8 +326,22 @@ func (s *Service) StartMessaging(dht *dht.IpfsDHT, stats *Stats, peerType string
 			allRandomParcels := append(randomRowParcels, randomColParcels...)
 			allRandomParcels = append(allRandomParcels, randomParcels...)
 
+<<<<<<< HEAD
 			wg := sync.WaitGroup{}
 			wg.Add(len(allRandomParcels))
+=======
+			for len(allRandomParcels) > 0 {
+
+				if ctx.Err() != nil {
+					log.Printf("[V - B%d] Sampling timed out after %.2f seconds.\n", blockID, time.Since(startTime).Seconds())
+					break
+				}
+
+				randomIndex := 0
+				if len(allRandomParcels) > 1 {
+					randomIndex = rand.Intn(len(allRandomParcels))
+				}
+>>>>>>> discovery_removal
 
 			var mu sync.Mutex
 
@@ -343,7 +392,9 @@ func (s *Service) StartMessaging(dht *dht.IpfsDHT, stats *Stats, peerType string
 			wg.Wait()
 
 			if len(allRandomParcels) == 0 {
-				log.Printf(peerName+" B%d: All Sampling took %.2f seconds.\n", blockID, time.Since(startTime).Seconds())
+				log.Printf("[V - B%d] All Sampling took %.2f seconds.\n", blockID, time.Since(startTime).Seconds())
+
+				stats.TotalSamplingLatencies = append(stats.TotalSamplingLatencies, time.Since(startTime))
 
 				blockID += 1
 			}
@@ -351,11 +402,15 @@ func (s *Service) StartMessaging(dht *dht.IpfsDHT, stats *Stats, peerType string
 
 	} else if peerType == "nonvalidator" {
 
-		peerName := "[NON-VALIDATOR\t" + s.host.ID()[0:5].Pretty() + "]"
-
 		blockID := 0
 
 		for blockID < TotalBlocksCount {
+
+			ctx, cancel := context.WithTimeout(ctx, TimeoutDuration)
+			defer cancel()
+
+			log.Printf("[R - %s] Starting to sample block %d...\n", s.host.ID()[0:5].Pretty(), blockID)
+
 			startTime := time.Now()
 			randomSamplingDurationMicrosec := int64(0)
 
@@ -365,8 +420,22 @@ func (s *Service) StartMessaging(dht *dht.IpfsDHT, stats *Stats, peerType string
 
 			randomParcels := pickRandomParcels(allParcels, randomParcelsNeededCount)
 
+<<<<<<< HEAD
 			wg := sync.WaitGroup{}
 			wg.Add(len(randomParcels))
+=======
+			for len(randomParcels) > 0 {
+
+				if ctx.Err() != nil {
+					log.Printf("[R - B%d] Sampling timed out after %.2f seconds.\n", blockID, time.Since(startTime).Seconds())
+					break
+				}
+
+				randomIndex := 0
+				if len(randomParcels) > 1 {
+					randomIndex = rand.Intn(len(randomParcels))
+				}
+>>>>>>> discovery_removal
 
 			var mu sync.Mutex
 
@@ -374,9 +443,32 @@ func (s *Service) StartMessaging(dht *dht.IpfsDHT, stats *Stats, peerType string
 				go func(randomParcel Parcel) {
 					defer wg.Done()
 
+<<<<<<< HEAD
 					parcelType := "row"
 					if !randomParcel.IsRow {
 						parcelType = "col"
+=======
+				getStartTime := time.Now()
+				_, hops, err := dht.GetValueHops(
+					ctx,
+					"/das/sample/"+fmt.Sprint(blockID)+"/"+parcelType+"/"+fmt.Sprint(randomParcel.StartingIndex),
+				)
+
+				if err != nil {
+					stats.TotalFailedGets += 1
+					stats.TotalGetMessages += 1
+				} else {
+					stats.GetLatencies = append(stats.GetLatencies, time.Since(getStartTime))
+					stats.TotalGetMessages += 1
+					stats.TotalSuccessGets += 1
+					stats.GetHops = append(stats.GetHops, hops)
+
+					randomParcels = append(randomParcels[:randomIndex], randomParcels[randomIndex+1:]...)
+
+					if len(randomParcels) == 0 && randomSamplingDurationMicrosec == 0 {
+						randomSamplingDurationMicrosec = time.Since(startTime).Microseconds()
+						stats.RandomSamplingLatencies = append(stats.RandomSamplingLatencies, time.Since(startTime))
+>>>>>>> discovery_removal
 					}
 
 					getStartTime := time.Now()
@@ -409,7 +501,10 @@ func (s *Service) StartMessaging(dht *dht.IpfsDHT, stats *Stats, peerType string
 			wg.Wait()
 
 			if len(randomParcels) == 0 {
-				log.Printf(peerName+" B%d: All Sampling took %.2f seconds.\n", blockID, time.Since(startTime).Seconds())
+				log.Printf("[R - B%d] All Sampling took %.2f seconds.\n", blockID, time.Since(startTime).Seconds())
+
+				stats.TotalSamplingLatencies = append(stats.TotalSamplingLatencies, time.Since(startTime))
+
 				blockID += 1
 			}
 		}
