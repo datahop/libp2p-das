@@ -14,6 +14,7 @@ validatorCount=$2
 nonValidatorCount=$3
 parcelSize=$4
 
+
 if [ $builderCount -le 0 ]; then
     echo "builderCount should be greater than 0."
     exit 1
@@ -26,6 +27,8 @@ if [ $nonBuilderCount -le 0 ]; then
     exit 1
 fi
 
+echo "Starting $builderCount builder(s), $validatorCount validator(s), and $nonValidatorCount non-validator(s) with parcel size $parcelSize..."
+
 # Create an array to store background process IDs
 declare -a bg_pids
 
@@ -35,16 +38,19 @@ for ((i=1; i<=$builderCount; i++)); do
     ./run_node.sh builder $parcelSize &
     bg_pids+=($!)  # Store the background process ID in the array
 done
+echo "Buiders started."
 
 for ((i=1; i<=$validatorCount; i++)); do
     ./run_node.sh validator $parcelSize &
     bg_pids+=($!)
 done
+echo "Validators started."
 
 for ((i=1; i<=$nonValidatorCount; i++)); do
     ./run_node.sh nonvalidator $parcelSize &
     bg_pids+=($!)
 done
+echo "Non-validators started."
 
 # Wait for all background processes to finish
 for pid in "${bg_pids[@]}"; do
