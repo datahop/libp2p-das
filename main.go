@@ -7,7 +7,6 @@ import (
 	"flag"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"log"
 	mrand "math/rand"
 	"os"
@@ -69,8 +68,8 @@ var config Config
 
 func main() {
 	// Turn on/off logging messages in stdout
-	log.SetOutput(ioutil.Discard)
-	// log.SetOutput(os.Stdout)
+	// log.SetOutput(ioutil.Discard)
+	log.SetOutput(os.Stdout)
 
 	stats := &Stats{}
 
