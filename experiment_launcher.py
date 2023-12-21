@@ -66,9 +66,9 @@ def node_partition(nb_cluster_machine, nb_builder, nb_validator, nb_regular):
 def main(output_dir):
     #========== Parameters ==========
     #Grid5000 parameters
-    login = "mapigaglio" #Grid5000 login
+    login = "kpeeroo" #Grid5000 login
     site = "nancy" #Grid5000 Site See: https://www.grid5000.fr/w/Status and https://www.grid5000.fr/w/Hardware
-    cluster = "gros" #Gride5000 Cluster name See: https://www.grid5000.fr/w/Status and https://www.grid5000.fr/w/Hardware
+    cluster = "grisou" #Gride5000 Cluster name See: https://www.grid5000.fr/w/Status and https://www.grid5000.fr/w/Hardware
     job_name = "PANDAS_libp2p"
 
     #Node launch script path
@@ -76,13 +76,12 @@ def main(output_dir):
     launch_script = dir_path +"/" + "run.sh"
 
     #Experiment parameters
-    nb_cluster_machine = 30         #Number of machine booked on the cluster
-    nb_experiment_node = 1000        #Number of nodes running for the experiment
+    nb_cluster_machine = 1         #Number of machine booked on the cluster
+    nb_experiment_node = 11        #Number of nodes running for the experiment
     nb_builder = 1
-    nb_validator = 100
+    nb_validator = 5
     nb_regular = nb_experiment_node - nb_builder - nb_validator
-    exp_duration = 600               #In seconds
-    experiment_name = f"PANDAS_libp2p_{nb_builder}b_{nb_validator}v_{nb_regular}r_{exp_duration}sec_"
+    experiment_name = f"PANDAS_libp2p_{nb_builder}b_{nb_validator}v_{nb_regular}r_"
     current_datetime = datetime.datetime.now()
     experiment_name += current_datetime.strftime("%Y-%m-%d-%H:%M:%S") 
     
@@ -95,14 +94,13 @@ def main(output_dir):
     #========== Experiment nodes partition on cluster machines ==========
     partition = node_partition(nb_cluster_machine, nb_builder, nb_validator, nb_regular)
 
-
     #========== Create and validate Grid5000 and network emulation configurations ==========
     #Log to Grid5000 and check connection
     en.init_logging(level=logging.INFO)
     en.check()
     network = en.G5kNetworkConf(type="prod", roles=["experiment_network"], site=site)
     
-    Job_walltime = seconds_to_hh_mm_ss(exp_duration + 120)
+    Job_walltime = seconds_to_hh_mm_ss(240)
 
     conf = (
         en.G5kConf.from_settings(job_name=job_name, walltime=Job_walltime)
@@ -144,26 +142,25 @@ def main(output_dir):
     results = en.run_command("ip -o -4 addr show scope global | awk '!/^[0-9]+: lo:/ {print $4}' | cut -d '/' -f 1", roles=roles["experiment"][0])
     ip = results[0].payload["stdout"]
 
-    
     for x in roles["experiment"]:
         with en.actions(roles=x, on_error_continue=True, background=True) as p:
             if x == roles["experiment"][0]:
                 builder, validator, regular = partition[i]
-                p.shell(f"/home/{login}/run.sh {exp_duration} {experiment_name} {builder} {validator} {regular} {login} 127.0.0.1")
+                p.shell(f"/home/{login}/run.sh {experiment_name} {builder} {validator} {regular} {login} 127.0.0.1")
                 i += 1
             else:
                 builder, validator, regular = partition[i]
-                p.shell(f"/home/{login}/run.sh {exp_duration} {experiment_name} {builder} {validator} {regular} {login} {ip}")
+                p.shell(f"/home/{login}/run.sh {experiment_name} {builder} {validator} {regular} {login} {ip}")
                 i += 1
     start = datetime.datetime.now() #Timestamp grid5000 job start
 
-    #========== Wait job and and release grid5000 ressources ==========
+    #========== Wait job and and release grid5000 resources ==========
     #Print experiment duration
-    h,m,s = convert_seconds_to_time(exp_duration)
+    h,m,s = convert_seconds_to_time(240)
     print("Begin at: ",start)
-    print("Expected to finish at: ",add_time(start,h,m,s + 10))
+    print("Expected to finish at: ", add_time(start,h,m,s + 10))
     
-    for i in track(range(exp_duration + 20), description="Waiting for experiment to finish..."):
+    for i in track(range(240), description="Waiting for experiment to finish..."):
         time.sleep(1)
 
     """
