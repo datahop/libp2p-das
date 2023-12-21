@@ -162,9 +162,10 @@ def main(output_dir):
 
     print("Start: ", start)
     
-    #Wait for experiment to finish
-    for process in background_processes:
-        process.wait()
+    if len(background_processes) > 0:
+        #Wait for experiment to finish
+        for process in background_processes:
+            process.wait()
         
     end = datetime.datetime.now() #Timestamp grid5000 job end
     print("End: ",end)
