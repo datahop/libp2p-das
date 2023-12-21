@@ -143,27 +143,31 @@ def main(output_dir):
     results = en.run_command("ip -o -4 addr show scope global | awk '!/^[0-9]+: lo:/ {print $4}' | cut -d '/' -f 1", roles=roles["experiment"][0])
     ip = results[0].payload["stdout"]
 
+    background_processes = []
+
     for x in roles["experiment"]:
         with en.actions(roles=x, on_error_continue=True, background=True) as p:
             if x == roles["experiment"][0]:
                 builder, validator, regular = partition[i]
-                p.shell(f"/home/{login}/run.sh {experiment_name} {builder} {validator} {regular} {login} 127.0.0.1 {parcel_size}")
+                process = p.shell(f"/home/{login}/run.sh {experiment_name} {builder} {validator} {regular} {login} 127.0.0.1 {parcel_size}", timeout=120)
+                background_processes.append(process)
                 i += 1
             else:
                 builder, validator, regular = partition[i]
-                p.shell(f"/home/{login}/run.sh {experiment_name} {builder} {validator} {regular} {login} {ip} {parcel_size}")
+                process = p.shell(f"/home/{login}/run.sh {experiment_name} {builder} {validator} {regular} {login} {ip} {parcel_size}", timeout=120)
+                background_processes.append(process)
                 i += 1
     
     start = datetime.datetime.now() #Timestamp grid5000 job start
 
-    #========== Wait job and and release grid5000 resources ==========
-    #Print experiment duration
-    h,m,s = convert_seconds_to_time(240)
-    print("Begin at: ",start)
-    print("Expected to finish at: ", add_time(start,h,m,s + 10))
+    print("Start: ", start)
     
-    # for i in track(range(240), description="Waiting for experiment to finish..."):
-    #     time.sleep(1)
+    #Wait for experiment to finish
+    for process in background_processes:
+        process.wait()
+        
+    end = datetime.datetime.now() #Timestamp grid5000 job end
+    print("End: ",end)
 
     """
     if output_dir != None:
