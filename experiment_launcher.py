@@ -1,4 +1,5 @@
 import logging
+from icecream import ic
 import enoslib as en
 import os
 import datetime
@@ -68,7 +69,7 @@ def main(output_dir):
     #Grid5000 parameters
     login = "kpeeroo" #Grid5000 login
     site = "nancy" #Grid5000 Site See: https://www.grid5000.fr/w/Status and https://www.grid5000.fr/w/Hardware
-    cluster = "grisou" #Gride5000 Cluster name See: https://www.grid5000.fr/w/Status and https://www.grid5000.fr/w/Hardware
+    cluster = "gros" #Gride5000 Cluster name See: https://www.grid5000.fr/w/Status and https://www.grid5000.fr/w/Hardware
     job_name = "PANDAS_libp2p"
 
     #Node launch script path
@@ -77,14 +78,15 @@ def main(output_dir):
 
     #Experiment parameters
     parcel_size = 512
-    nb_cluster_machine = 1         #Number of machine booked on the cluster
-    nb_experiment_node = 11        #Number of nodes running for the experiment
+    nb_cluster_machine = 3         #Number of machine booked on the cluster
+    nb_experiment_node = 3        #Number of nodes running for the experiment
     nb_builder = 1
-    nb_validator = 5
+    nb_validator = 1
     nb_regular = nb_experiment_node - nb_builder - nb_validator
-    experiment_name = f"PANDAS_libp2p_{nb_builder}b_{nb_validator}v_{nb_regular}r_"
+    experiment_name = f"PANDAS_libp2p_{nb_builder}b_{nb_validator}v_{nb_regular}r_{parcel_size}p_"
     current_datetime = datetime.datetime.now()
     experiment_name += current_datetime.strftime("%Y-%m-%d-%H:%M:%S")
+    walltime_secs = 300 #Experiment walltime in seconds
     
     #Network parameters 
     delay = "10%"
@@ -101,10 +103,10 @@ def main(output_dir):
     en.check()
     network = en.G5kNetworkConf(type="prod", roles=["experiment_network"], site=site)
     
-    Job_walltime = seconds_to_hh_mm_ss(240)
+    job_walltime = seconds_to_hh_mm_ss(walltime_secs)
 
     conf = (
-        en.G5kConf.from_settings(job_name=job_name, walltime=Job_walltime)
+        en.G5kConf.from_settings(job_name=job_name, walltime=job_walltime)
         .add_network_conf(network)
         .add_machine(roles=["experiment"], cluster=cluster, nodes=nb_cluster_machine, primary_network=network) # Add experiment nodes
         .finalize()
@@ -143,32 +145,25 @@ def main(output_dir):
     results = en.run_command("ip -o -4 addr show scope global | awk '!/^[0-9]+: lo:/ {print $4}' | cut -d '/' -f 1", roles=roles["experiment"][0])
     ip = results[0].payload["stdout"]
 
-    background_processes = []
-
     for x in roles["experiment"]:
         with en.actions(roles=x, on_error_continue=True, background=True) as p:
             if x == roles["experiment"][0]:
                 builder, validator, regular = partition[i]
-                process = p.shell(f"/home/{login}/run.sh {experiment_name} {builder} {validator} {regular} {login} 127.0.0.1 {parcel_size}", timeout=120)
-                background_processes.append(process)
+                p.shell(f"/home/{login}/run.sh {experiment_name} {builder} {validator} {regular} {login} 127.0.0.1 {parcel_size}")
                 i += 1
             else:
                 builder, validator, regular = partition[i]
-                process = p.shell(f"/home/{login}/run.sh {experiment_name} {builder} {validator} {regular} {login} {ip} {parcel_size}", timeout=120)
-                background_processes.append(process)
+                p.shell(f"/home/{login}/run.sh {experiment_name} {builder} {validator} {regular} {login} {ip} {parcel_size}")
                 i += 1
     
     start = datetime.datetime.now() #Timestamp grid5000 job start
-
-    print("Start: ", start)
+    start_formatted = start.strftime("%H:%M:%S")
     
-    if len(background_processes) > 0:
-        #Wait for experiment to finish
-        for process in background_processes:
-            process.wait()
-        
-    end = datetime.datetime.now() #Timestamp grid5000 job end
-    print("End: ",end)
+    console.print("Start: ", start_formatted, style="bold green")
+    console.print("Expected End: ", add_time(start, seconds=walltime_secs).strftime("%H:%M:%S"), style="bold green")
+
+    for i in track(range(walltime_secs + 30), description="Waiting for walltime..."):
+        time.sleep(1)
 
     """
     if output_dir != None:
@@ -205,6 +200,7 @@ def main(output_dir):
             remote_path = os.path.join(results_dir, folder)
             subprocess.run(["ssh", f"{login}@access.grid5000.fr", f"rm -rf {site}{remote_path}"])
         """
+    
     #Release all Grid'5000 resources
     # netem.destroy()
     provider.destroy()
