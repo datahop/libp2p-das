@@ -62,7 +62,7 @@ def node_partition(nb_cluster_machine, nb_builder, nb_validator, nb_regular):
             nb_regular -= 1      
         index += 1
     return partition
- 
+
 def main(output_dir):
     #========== Parameters ==========
     #Grid5000 parameters
@@ -76,6 +76,7 @@ def main(output_dir):
     launch_script = dir_path +"/" + "run.sh"
 
     #Experiment parameters
+    parcel_size = 512
     nb_cluster_machine = 1         #Number of machine booked on the cluster
     nb_experiment_node = 11        #Number of nodes running for the experiment
     nb_builder = 1
@@ -83,7 +84,7 @@ def main(output_dir):
     nb_regular = nb_experiment_node - nb_builder - nb_validator
     experiment_name = f"PANDAS_libp2p_{nb_builder}b_{nb_validator}v_{nb_regular}r_"
     current_datetime = datetime.datetime.now()
-    experiment_name += current_datetime.strftime("%Y-%m-%d-%H:%M:%S") 
+    experiment_name += current_datetime.strftime("%Y-%m-%d-%H:%M:%S")
     
     #Network parameters 
     delay = "10%"
@@ -146,12 +147,13 @@ def main(output_dir):
         with en.actions(roles=x, on_error_continue=True, background=True) as p:
             if x == roles["experiment"][0]:
                 builder, validator, regular = partition[i]
-                p.shell(f"/home/{login}/run.sh {experiment_name} {builder} {validator} {regular} {login} 127.0.0.1")
+                p.shell(f"/home/{login}/run.sh {experiment_name} {builder} {validator} {regular} {login} 127.0.0.1 {parcel_size}")
                 i += 1
             else:
                 builder, validator, regular = partition[i]
-                p.shell(f"/home/{login}/run.sh {experiment_name} {builder} {validator} {regular} {login} {ip}")
+                p.shell(f"/home/{login}/run.sh {experiment_name} {builder} {validator} {regular} {login} {ip} {parcel_size}")
                 i += 1
+    
     start = datetime.datetime.now() #Timestamp grid5000 job start
 
     #========== Wait job and and release grid5000 resources ==========
@@ -160,8 +162,8 @@ def main(output_dir):
     print("Begin at: ",start)
     print("Expected to finish at: ", add_time(start,h,m,s + 10))
     
-    for i in track(range(240), description="Waiting for experiment to finish..."):
-        time.sleep(1)
+    # for i in track(range(240), description="Waiting for experiment to finish..."):
+    #     time.sleep(1)
 
     """
     if output_dir != None:
