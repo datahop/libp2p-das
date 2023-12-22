@@ -192,9 +192,14 @@ func (s *Service) StartMessaging(h host.Host, dht *dht.IpfsDHT, stats *Stats, pe
 		for blockID := 0; blockID < TotalBlocksCount; blockID++ {
 			log.Printf("[B - %s] Starting to seed block %d...\n", s.host.ID()[0:5].Pretty(), blockID)
 
-			seedingTime := time.Now()
+			startTime := time.Now()
 
 			allParcels := SplitSamplesIntoParcels(RowCount, parcelSize, "all")
+
+			// Randomize allParcels
+			rand.Shuffle(len(allParcels), func(i, j int) {
+				allParcels[i], allParcels[j] = allParcels[j], allParcels[i]
+			})
 
 			seededParcelIDs := make([]int, 0)
 
@@ -233,9 +238,9 @@ func (s *Service) StartMessaging(h host.Host, dht *dht.IpfsDHT, stats *Stats, pe
 			}
 			parcelWg.Wait()
 
-			stats.SeedingLatencies = append(stats.SeedingLatencies, time.Since(seedingTime))
+			stats.SeedingLatencies = append(stats.SeedingLatencies, time.Since(startTime))
 
-			log.Printf("[B - %s] Seeding took %.2f seconds.\n", s.host.ID()[0:5].Pretty(), time.Since(seedingTime).Seconds())
+			log.Printf("[B - %s] All seeding took %.2f seconds.\n", s.host.ID()[0:5].Pretty(), time.Since(startTime).Seconds())
 		}
 
 		log.Printf("[B - %s] Finished seeding %d blocks.\n", s.host.ID()[0:5].Pretty(), TotalBlocksCount)
@@ -258,6 +263,11 @@ func (s *Service) StartMessaging(h host.Host, dht *dht.IpfsDHT, stats *Stats, pe
 
 			allRandomParcels := append(randomRowParcels, randomColParcels...)
 			allRandomParcels = append(allRandomParcels, randomParcels...)
+
+			// Randomize allRandomParcels
+			rand.Shuffle(len(allRandomParcels), func(i, j int) {
+				allRandomParcels[i], allRandomParcels[j] = allRandomParcels[j], allRandomParcels[i]
+			})
 
 			sampledParcelIDs := make([]int, 0)
 
@@ -321,6 +331,11 @@ func (s *Service) StartMessaging(h host.Host, dht *dht.IpfsDHT, stats *Stats, pe
 
 			allRandomParcels := append(randomRowParcels, randomColParcels...)
 			allRandomParcels = append(allRandomParcels, randomParcels...)
+
+			// Randomize allRandomParcels
+			rand.Shuffle(len(allRandomParcels), func(i, j int) {
+				allRandomParcels[i], allRandomParcels[j] = allRandomParcels[j], allRandomParcels[i]
+			})
 
 			sampledParcelIDs := make([]int, 0)
 
