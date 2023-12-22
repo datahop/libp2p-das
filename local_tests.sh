@@ -1,4 +1,4 @@
-non_builder_counts=(5)
+non_builder_counts=(1 2 5 10 15 20)
 parcel_sizes=(512 256)
 
 total_test_count=$(( ${#non_builder_counts[@]} * ${#parcel_sizes[@]} ))
