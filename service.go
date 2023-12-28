@@ -192,7 +192,7 @@ func (s *Service) StartMessaging(h host.Host, dht *dht.IpfsDHT, stats *Stats, pe
 	}
 
 	const ROW_COUNT = 512 // ? ROW_COUNTxROW_COUNT matrix
-	const TOTAL_BLOCK_COUNT = 5
+	const TOTAL_BLOCK_COUNT = 3
 	const BLOCK_TIME_SEC = 12
 
 	if peerType == "builder" {
@@ -210,7 +210,7 @@ func (s *Service) StartMessaging(h host.Host, dht *dht.IpfsDHT, stats *Stats, pe
 			defer wg.Done()
 			blockID := 0
 			for range ticker.C {
-				// Add an extra block to give everyone a chance to seed the last block
+				// Add an extra block to give everyone a chance to sample the last block
 				if blockID >= TOTAL_BLOCK_COUNT+1 {
 					ticker.Stop()
 					return
@@ -243,6 +243,11 @@ func (s *Service) StartMessaging(h host.Host, dht *dht.IpfsDHT, stats *Stats, pe
 						}
 
 						for !contains(seededParcelIDs, p.StartingIndex) {
+							remainingTime := time.Until(startTime.Add(BLOCK_TIME_SEC * time.Second))
+
+							ctx, cancel := context.WithTimeout(ctx, remainingTime)
+							defer cancel()
+
 							putStartTime := time.Now()
 							putErr := dht.PutValue(
 								ctx,
@@ -251,16 +256,28 @@ func (s *Service) StartMessaging(h host.Host, dht *dht.IpfsDHT, stats *Stats, pe
 							)
 
 							if putErr != nil {
+								parcelStatus := "fail"
+								if putErr.Error() == "context deadline exceeded" {
+									parcelStatus = "timeout"
+								}
 
 								stats.PutLatencies = append(stats.PutLatencies, time.Since(putStartTime))
 								stats.PutTimestamps = append(stats.PutTimestamps, time.Now().Format("15:04:05.000000"))
 								stats.BlockIDs = append(stats.BlockIDs, fmt.Sprint(blockID))
 								stats.ParcelIDs = append(stats.ParcelIDs, fmt.Sprint(p.StartingIndex))
-								stats.ParcelStatuses = append(stats.ParcelStatuses, "fail")
+								stats.ParcelStatuses = append(stats.ParcelStatuses, parcelStatus)
 
 								stats.TotalFailedPuts += 1
 								stats.TotalPutMessages += 1
+
+								if putErr.Error() == "context deadline exceeded" {
+									break
+								} else {
+									log.Printf("[B - %s] Failed to put parcel %d: %s\n", s.host.ID()[0:5].Pretty(), p.StartingIndex, putErr.Error())
+								}
 							} else {
+
+								// log.Printf("[B - %s] Successfully put parcel %d\n", s.host.ID()[0:5].Pretty(), p.StartingIndex)
 
 								stats.PutLatencies = append(stats.PutLatencies, time.Since(putStartTime))
 								stats.PutTimestamps = append(stats.PutTimestamps, time.Now().Format("15:04:05.000000"))
@@ -294,6 +311,8 @@ func (s *Service) StartMessaging(h host.Host, dht *dht.IpfsDHT, stats *Stats, pe
 
 		for blockID := 0; blockID <= TOTAL_BLOCK_COUNT; blockID++ {
 
+			startTime := time.Now()
+
 			log.Printf("[V - %s] Starting to sample block %d...\n", s.host.ID()[0:5].Pretty(), blockID)
 
 			rowColParcelsNeededCount := (ROW_COUNT / 2) / parcelSize
@@ -317,8 +336,6 @@ func (s *Service) StartMessaging(h host.Host, dht *dht.IpfsDHT, stats *Stats, pe
 
 			sampledParcelIDs := make([]int, 0)
 
-			startTime := time.Now()
-
 			var parcelWg sync.WaitGroup
 			for _, parcel := range allRandomParcels {
 				parcelWg.Add(1)
@@ -331,6 +348,11 @@ func (s *Service) StartMessaging(h host.Host, dht *dht.IpfsDHT, stats *Stats, pe
 					}
 
 					for !contains(sampledParcelIDs, p.StartingIndex) {
+						remainingTime := time.Until(startTime.Add(BLOCK_TIME_SEC * time.Second))
+
+						ctx, cancel := context.WithTimeout(ctx, remainingTime)
+						defer cancel()
+
 						getStartTime := time.Now()
 						_, hops, err := dht.GetValueHops(
 							ctx,
@@ -338,16 +360,26 @@ func (s *Service) StartMessaging(h host.Host, dht *dht.IpfsDHT, stats *Stats, pe
 						)
 
 						if err != nil {
+							// log.Printf("[V - %s] Failed to get parcel %d: %s\n", s.host.ID()[0:5].Pretty(), p.StartingIndex, err.Error())
+
+							parcelStatus := "fail"
+							if err.Error() == "context deadline exceeded" {
+								parcelStatus = "timeout"
+							}
+
 							stats.GetLatencies = append(stats.GetLatencies, time.Since(getStartTime))
 							stats.GetHops = append(stats.GetHops, hops)
 							stats.GetTimestamps = append(stats.GetTimestamps, time.Now().Format("15:04:05.000000"))
 							stats.BlockIDs = append(stats.BlockIDs, fmt.Sprint(blockID))
 							stats.ParcelIDs = append(stats.ParcelIDs, fmt.Sprint(p.StartingIndex))
-							stats.ParcelStatuses = append(stats.ParcelStatuses, "fail")
+							stats.ParcelStatuses = append(stats.ParcelStatuses, parcelStatus)
 
 							stats.TotalFailedGets += 1
 							stats.TotalGetMessages += 1
 
+							if err.Error() == "context deadline exceeded" {
+								break
+							}
 						} else {
 							stats.GetLatencies = append(stats.GetLatencies, time.Since(getStartTime))
 							stats.GetHops = append(stats.GetHops, hops)
@@ -372,11 +404,16 @@ func (s *Service) StartMessaging(h host.Host, dht *dht.IpfsDHT, stats *Stats, pe
 
 			log.Printf("[V - %s] Block %d sampling took %.2f seconds.\n", s.host.ID()[0:5].Pretty(), blockID, time.Since(startTime).Seconds())
 
+			// Wait until the block time is over
+			remainingTime := time.Until(startTime.Add(BLOCK_TIME_SEC * time.Second))
+			time.Sleep(remainingTime)
+
 		}
 
 	} else if peerType == "nonvalidator" {
 
 		for blockID := 0; blockID <= TOTAL_BLOCK_COUNT; blockID++ {
+			startTime := time.Now()
 
 			log.Printf("[R - %s] Starting to sample block %d...\n", s.host.ID()[0:5].Pretty(), blockID)
 
@@ -401,8 +438,6 @@ func (s *Service) StartMessaging(h host.Host, dht *dht.IpfsDHT, stats *Stats, pe
 
 			sampledParcelIDs := make([]int, 0)
 
-			startTime := time.Now()
-
 			var parcelWg sync.WaitGroup
 			for _, parcel := range allRandomParcels {
 				parcelWg.Add(1)
@@ -415,6 +450,11 @@ func (s *Service) StartMessaging(h host.Host, dht *dht.IpfsDHT, stats *Stats, pe
 					}
 
 					for !contains(sampledParcelIDs, p.StartingIndex) {
+						remainingTime := time.Until(startTime.Add(BLOCK_TIME_SEC * time.Second))
+
+						ctx, cancel := context.WithTimeout(ctx, remainingTime)
+						defer cancel()
+
 						getStartTime := time.Now()
 						_, hops, err := dht.GetValueHops(
 							ctx,
@@ -422,19 +462,28 @@ func (s *Service) StartMessaging(h host.Host, dht *dht.IpfsDHT, stats *Stats, pe
 						)
 
 						if err != nil {
-							// Log Stats
+							// log.Printf("[V - %s] Failed to get parcel %d: %s\n", s.host.ID()[0:5].Pretty(), p.StartingIndex, err.Error())
+
+							parcelStatus := "fail"
+							if err.Error() == "context deadline exceeded" {
+								parcelStatus = "timeout"
+							}
+
 							stats.GetLatencies = append(stats.GetLatencies, time.Since(getStartTime))
 							stats.GetHops = append(stats.GetHops, hops)
 							stats.GetTimestamps = append(stats.GetTimestamps, time.Now().Format("15:04:05.000000"))
 							stats.BlockIDs = append(stats.BlockIDs, fmt.Sprint(blockID))
 							stats.ParcelIDs = append(stats.ParcelIDs, fmt.Sprint(p.StartingIndex))
-							stats.ParcelStatuses = append(stats.ParcelStatuses, "fail")
+							stats.ParcelStatuses = append(stats.ParcelStatuses, parcelStatus)
 
 							stats.TotalFailedGets += 1
 							stats.TotalGetMessages += 1
-							// log.Printf("[V - %s] Failed to get parcel %d: %s\n", s.host.ID()[0:5].Pretty(), p.StartingIndex, err.Error())
+
+							if err.Error() == "context deadline exceeded" {
+								break
+							}
+
 						} else {
-							// Log Stats
 							stats.GetLatencies = append(stats.GetLatencies, time.Since(getStartTime))
 							stats.GetHops = append(stats.GetHops, hops)
 							stats.GetTimestamps = append(stats.GetTimestamps, time.Now().Format("15:04:05.000000"))
@@ -456,6 +505,10 @@ func (s *Service) StartMessaging(h host.Host, dht *dht.IpfsDHT, stats *Stats, pe
 			stats.TotalSamplingLatencies = append(stats.TotalSamplingLatencies, time.Since(startTime))
 
 			log.Printf("[R - %s] Block %d sampling took %.2f seconds.\n", s.host.ID()[0:5].Pretty(), blockID, time.Since(startTime).Seconds())
+
+			// Wait until the block time is over
+			remainingTime := time.Until(startTime.Add(BLOCK_TIME_SEC * time.Second))
+			time.Sleep(remainingTime)
 
 		}
 
