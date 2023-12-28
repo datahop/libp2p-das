@@ -41,6 +41,7 @@ type Config struct {
 type Stats struct {
 	TotalPutMessages int
 	TotalFailedPuts  int
+	TotalSuccessPuts int
 	TotalGetMessages int
 	TotalFailedGets  int
 	TotalSuccessGets int
@@ -60,6 +61,7 @@ type Stats struct {
 	RandomSamplingLatencies []time.Duration
 	// ? How long it took to sample everything
 	TotalSamplingLatencies []time.Duration
+
 	// ? Array of hops for gets
 	GetHops []int
 
@@ -231,9 +233,9 @@ func writeTotalStatsToFile(stats *Stats, h host.Host, nodeType string) (string, 
 	w := csv.NewWriter(f)
 	defer w.Flush()
 
-	headers := []string{"Total PUT messages", "Total failed PUTs", "Total GET messages", "Total failed GETs", "Total successful GETs"}
+	headers := []string{"Total PUT messages", "Total failed PUTs", "Total successful PUTs", "Total GET messages", "Total failed GETs", "Total successful GETs"}
 	rows := [][]string{
-		{strconv.Itoa(stats.TotalPutMessages), strconv.Itoa(stats.TotalFailedPuts), strconv.Itoa(stats.TotalGetMessages), strconv.Itoa(stats.TotalFailedGets), strconv.Itoa(stats.TotalSuccessGets)},
+		{strconv.Itoa(stats.TotalPutMessages), strconv.Itoa(stats.TotalFailedPuts), strconv.Itoa(stats.TotalSuccessPuts), strconv.Itoa(stats.TotalGetMessages), strconv.Itoa(stats.TotalFailedGets), strconv.Itoa(stats.TotalSuccessGets)},
 	}
 
 	// Write headers and rows to CSV file

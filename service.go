@@ -242,6 +242,7 @@ func (s *Service) StartMessaging(h host.Host, dht *dht.IpfsDHT, stats *Stats, pe
 
 							seededParcelIDs = append(seededParcelIDs, p.StartingIndex)
 
+							stats.TotalSuccessPuts += 1
 							stats.TotalPutMessages += 1
 						}
 					}
