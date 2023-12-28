@@ -228,9 +228,15 @@ func (s *Service) StartMessaging(h host.Host, dht *dht.IpfsDHT, stats *Stats, pe
 							stats.TotalFailedPuts += 1
 							stats.TotalPutMessages += 1
 						} else {
+							// Log Stats
 							stats.PutLatencies = append(stats.PutLatencies, time.Since(putStartTime))
-							stats.TotalPutMessages += 1
+							stats.PutTimestamps = append(stats.PutTimestamps, time.Now().Format("15:04:05.000"))
+							stats.BlockIDs = append(stats.BlockIDs, fmt.Sprint(blockID))
+							stats.ParcelIDs = append(stats.ParcelIDs, fmt.Sprint(p.StartingIndex))
+
 							seededParcelIDs = append(seededParcelIDs, p.StartingIndex)
+
+							stats.TotalPutMessages += 1
 						}
 					}
 
@@ -294,11 +300,18 @@ func (s *Service) StartMessaging(h host.Host, dht *dht.IpfsDHT, stats *Stats, pe
 						if err != nil {
 							stats.TotalFailedGets += 1
 							stats.TotalGetMessages += 1
+							// log.Printf("[V - %s] Failed to get parcel %d: %s\n", s.host.ID()[0:5].Pretty(), p.StartingIndex, err.Error())
 						} else {
+							// Log Stats
 							stats.GetLatencies = append(stats.GetLatencies, time.Since(getStartTime))
+							stats.GetHops = append(stats.GetHops, hops)
+							stats.GetTimestamps = append(stats.GetTimestamps, time.Now().Format("15:04:05.000"))
+							stats.BlockIDs = append(stats.BlockIDs, fmt.Sprint(blockID))
+							stats.ParcelIDs = append(stats.ParcelIDs, fmt.Sprint(p.StartingIndex))
+
 							stats.TotalGetMessages += 1
 							stats.TotalSuccessGets += 1
-							stats.GetHops = append(stats.GetHops, hops)
+
 							sampledParcelIDs = append(sampledParcelIDs, p.StartingIndex)
 
 						}
@@ -362,11 +375,18 @@ func (s *Service) StartMessaging(h host.Host, dht *dht.IpfsDHT, stats *Stats, pe
 						if err != nil {
 							stats.TotalFailedGets += 1
 							stats.TotalGetMessages += 1
+							// log.Printf("[V - %s] Failed to get parcel %d: %s\n", s.host.ID()[0:5].Pretty(), p.StartingIndex, err.Error())
 						} else {
+							// Log Stats
 							stats.GetLatencies = append(stats.GetLatencies, time.Since(getStartTime))
+							stats.GetHops = append(stats.GetHops, hops)
+							stats.GetTimestamps = append(stats.GetTimestamps, time.Now().Format("15:04:05.000"))
+							stats.BlockIDs = append(stats.BlockIDs, fmt.Sprint(blockID))
+							stats.ParcelIDs = append(stats.ParcelIDs, fmt.Sprint(p.StartingIndex))
+
 							stats.TotalGetMessages += 1
 							stats.TotalSuccessGets += 1
-							stats.GetHops = append(stats.GetHops, hops)
+
 							sampledParcelIDs = append(sampledParcelIDs, p.StartingIndex)
 
 						}

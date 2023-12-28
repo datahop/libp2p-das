@@ -7,7 +7,6 @@ import (
 	"flag"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"log"
 	mrand "math/rand"
 	"os"
@@ -63,14 +62,20 @@ type Stats struct {
 	TotalSamplingLatencies []time.Duration
 	// ? Array of hops for gets
 	GetHops []int
+
+	PutTimestamps []string
+	GetTimestamps []string
+
+	BlockIDs  []string
+	ParcelIDs []string
 }
 
 var config Config
 
 func main() {
 	// Turn on/off logging messages in stdout
-	log.SetOutput(ioutil.Discard)
-	// log.SetOutput(os.Stdout)
+	// log.SetOutput(ioutil.Discard)
+	log.SetOutput(os.Stdout)
 
 	stats := &Stats{}
 
@@ -295,6 +300,31 @@ func writeLatencyStatsToFile(stats *Stats, h host.Host, nodeType string) (string
 		} else {
 			row = append(row, "")
 		}
+
+		if i < len(stats.BlockIDs) {
+			row = append(row, stats.BlockIDs[i])
+		} else {
+			row = append(row, "")
+		}
+
+		if i < len(stats.ParcelIDs) {
+			row = append(row, stats.ParcelIDs[i])
+		} else {
+			row = append(row, "")
+		}
+
+		if i < len(stats.PutTimestamps) {
+			row = append(row, stats.PutTimestamps[i])
+		} else {
+			row = append(row, "")
+		}
+
+		if i < len(stats.GetTimestamps) {
+			row = append(row, stats.GetTimestamps[i])
+		} else {
+			row = append(row, "")
+		}
+
 		latencyRows = append(latencyRows, row)
 	}
 
@@ -308,7 +338,7 @@ func writeLatencyStatsToFile(stats *Stats, h host.Host, nodeType string) (string
 	w := csv.NewWriter(f)
 	defer w.Flush()
 
-	headers := []string{"Block Seeding Duration (us)", "PUT latencies (us)", "GET latencies (us)", "Row Sampling Latencies (us)", "Col Sampling Latencies (us)", "Random Sampling Latencies (us)", "Total Sampling Latencies (us)", "GET hops"}
+	headers := []string{"Block Seeding Duration (us)", "PUT latencies (us)", "GET latencies (us)", "Row Sampling Latencies (us)", "Col Sampling Latencies (us)", "Random Sampling Latencies (us)", "Total Sampling Latencies (us)", "GET hops", "Block ID", "Parcel ID", "PUT timestamps", "GET timestamps"}
 	rows := latencyRows
 
 	// Write headers and rows to CSV file
