@@ -178,9 +178,8 @@ func CopyEnvelopesToIfaces(in []*Envelope) []interface{} {
 
 func (s *Service) StartMessaging(h host.Host, dht *dht.IpfsDHT, stats *Stats, peerType string, parcelSize int, ctx context.Context) {
 
-	const RowCount = 512
-	const TotalBlocksCount = 5
-	const TimeoutDuration = time.Minute * 2
+	const ROW_COUNT = 512
+	const TOTAL_BLOCK_COUNT = 5
 
 	if peerType == "builder" {
 
@@ -189,12 +188,12 @@ func (s *Service) StartMessaging(h host.Host, dht *dht.IpfsDHT, stats *Stats, pe
 			time.Sleep(time.Second)
 		}
 
-		for blockID := 0; blockID < TotalBlocksCount; blockID++ {
+		for blockID := 0; blockID < TOTAL_BLOCK_COUNT; blockID++ {
 			log.Printf("[B - %s] Starting to seed block %d...\n", s.host.ID()[0:5].Pretty(), blockID)
 
 			startTime := time.Now()
 
-			allParcels := SplitSamplesIntoParcels(RowCount, parcelSize, "all")
+			allParcels := SplitSamplesIntoParcels(ROW_COUNT, parcelSize, "all")
 
 			// Randomize allParcels
 			rand.Shuffle(len(allParcels), func(i, j int) {
@@ -256,20 +255,20 @@ func (s *Service) StartMessaging(h host.Host, dht *dht.IpfsDHT, stats *Stats, pe
 			log.Printf("[B - %s] All seeding took %.2f seconds.\n", s.host.ID()[0:5].Pretty(), time.Since(startTime).Seconds())
 		}
 
-		log.Printf("[B - %s] Finished seeding %d blocks.\n", s.host.ID()[0:5].Pretty(), TotalBlocksCount)
+		log.Printf("[B - %s] Finished seeding %d blocks.\n", s.host.ID()[0:5].Pretty(), TOTAL_BLOCK_COUNT)
 
 	} else if peerType == "validator" {
 
-		for blockID := 0; blockID < TotalBlocksCount; blockID++ {
+		for blockID := 0; blockID < TOTAL_BLOCK_COUNT; blockID++ {
 
 			log.Printf("[V - %s] Starting to sample block %d...\n", s.host.ID()[0:5].Pretty(), blockID)
 
-			rowColParcelsNeededCount := (RowCount / 2) / parcelSize
+			rowColParcelsNeededCount := (ROW_COUNT / 2) / parcelSize
 			randomParcelsNeededCount := 75
 
-			allParcels := SplitSamplesIntoParcels(RowCount, parcelSize, "all")
-			rowParcels := SplitSamplesIntoParcels(RowCount, parcelSize, "row")
-			colParcels := SplitSamplesIntoParcels(RowCount, parcelSize, "col")
+			allParcels := SplitSamplesIntoParcels(ROW_COUNT, parcelSize, "all")
+			rowParcels := SplitSamplesIntoParcels(ROW_COUNT, parcelSize, "row")
+			colParcels := SplitSamplesIntoParcels(ROW_COUNT, parcelSize, "col")
 
 			randomRowParcels := pickRandomParcels(rowParcels, rowColParcelsNeededCount)
 			randomColParcels := pickRandomParcels(colParcels, rowColParcelsNeededCount)
@@ -345,16 +344,16 @@ func (s *Service) StartMessaging(h host.Host, dht *dht.IpfsDHT, stats *Stats, pe
 
 	} else if peerType == "nonvalidator" {
 
-		for blockID := 0; blockID < TotalBlocksCount; blockID++ {
+		for blockID := 0; blockID < TOTAL_BLOCK_COUNT; blockID++ {
 
 			log.Printf("[R - %s] Starting to sample block %d...\n", s.host.ID()[0:5].Pretty(), blockID)
 
-			rowColParcelsNeededCount := (RowCount / 2) / parcelSize
+			rowColParcelsNeededCount := (ROW_COUNT / 2) / parcelSize
 			randomParcelsNeededCount := 75
 
-			allParcels := SplitSamplesIntoParcels(RowCount, parcelSize, "all")
-			rowParcels := SplitSamplesIntoParcels(RowCount, parcelSize, "row")
-			colParcels := SplitSamplesIntoParcels(RowCount, parcelSize, "col")
+			allParcels := SplitSamplesIntoParcels(ROW_COUNT, parcelSize, "all")
+			rowParcels := SplitSamplesIntoParcels(ROW_COUNT, parcelSize, "row")
+			colParcels := SplitSamplesIntoParcels(ROW_COUNT, parcelSize, "col")
 
 			randomRowParcels := pickRandomParcels(rowParcels, rowColParcelsNeededCount)
 			randomColParcels := pickRandomParcels(colParcels, rowColParcelsNeededCount)
