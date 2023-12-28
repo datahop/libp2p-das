@@ -234,7 +234,6 @@ func (s *Service) StartMessaging(h host.Host, dht *dht.IpfsDHT, stats *Stats, pe
 							stats.TotalFailedPuts += 1
 							stats.TotalPutMessages += 1
 						} else {
-							// Log Stats
 							stats.PutLatencies = append(stats.PutLatencies, time.Since(putStartTime))
 							stats.PutTimestamps = append(stats.PutTimestamps, time.Now().Format("15:04:05.000000"))
 							stats.BlockIDs = append(stats.BlockIDs, fmt.Sprint(blockID))
@@ -242,8 +241,6 @@ func (s *Service) StartMessaging(h host.Host, dht *dht.IpfsDHT, stats *Stats, pe
 							stats.ParcelStatuses = append(stats.ParcelStatuses, "success")
 
 							seededParcelIDs = append(seededParcelIDs, p.StartingIndex)
-
-							stats.TotalPutMessages += 1
 						}
 					}
 
