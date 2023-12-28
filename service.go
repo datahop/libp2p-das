@@ -178,8 +178,22 @@ func CopyEnvelopesToIfaces(in []*Envelope) []interface{} {
 
 func (s *Service) StartMessaging(h host.Host, dht *dht.IpfsDHT, stats *Stats, peerType string, parcelSize int, ctx context.Context) {
 
+	if h == nil {
+		panic("Host is nil")
+	}
+	if dht == nil {
+		panic("DHT is nil")
+	}
+	if stats == nil {
+		panic("Stats is nil")
+	}
+	if ctx == nil {
+		panic("Context is nil")
+	}
+
 	const ROW_COUNT = 512
 	const TOTAL_BLOCK_COUNT = 5
+	const BLOCK_TIME_SEC = 12
 
 	if peerType == "builder" {
 
@@ -188,72 +202,90 @@ func (s *Service) StartMessaging(h host.Host, dht *dht.IpfsDHT, stats *Stats, pe
 			time.Sleep(time.Second)
 		}
 
-		for blockID := 0; blockID < TOTAL_BLOCK_COUNT; blockID++ {
-			log.Printf("[B - %s] Starting to seed block %d...\n", s.host.ID()[0:5].Pretty(), blockID)
+		blockID := 0
+		ticker := time.NewTicker(BLOCK_TIME_SEC * time.Second)
 
-			startTime := time.Now()
+		var wg sync.WaitGroup
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for range ticker.C {
+				if blockID >= TOTAL_BLOCK_COUNT {
+					ticker.Stop()
+					return
+				}
 
-			allParcels := SplitSamplesIntoParcels(ROW_COUNT, parcelSize, "all")
+				log.Printf("[B - %s] Starting to seed block %d...\n", s.host.ID()[0:5].Pretty(), blockID)
 
-			// Randomize allParcels
-			rand.Shuffle(len(allParcels), func(i, j int) {
-				allParcels[i], allParcels[j] = allParcels[j], allParcels[i]
-			})
+				startTime := time.Now()
 
-			seededParcelIDs := make([]int, 0)
+				allParcels := SplitSamplesIntoParcels(ROW_COUNT, parcelSize, "all")
 
-			var parcelWg sync.WaitGroup
-			for _, parcel := range allParcels {
-				parcelWg.Add(1)
-				go func(p Parcel) {
-					defer parcelWg.Done()
+				// Randomize allParcels
+				rand.Shuffle(len(allParcels), func(i, j int) {
+					allParcels[i], allParcels[j] = allParcels[j], allParcels[i]
+				})
 
-					parcelSamplesToSend := make([]byte, p.SampleCount*512)
+				seededParcelIDs := make([]int, 0)
 
-					parcelType := "row"
-					if !p.IsRow {
-						parcelType = "col"
-					}
+				var parcelWg sync.WaitGroup
+				for _, parcel := range allParcels {
+					parcelWg.Add(1)
+					go func(p Parcel) {
+						defer parcelWg.Done()
 
-					for !contains(seededParcelIDs, p.StartingIndex) {
-						putStartTime := time.Now()
-						putErr := dht.PutValue(
-							ctx,
-							"/das/sample/"+fmt.Sprint(blockID)+"/"+parcelType+"/"+fmt.Sprint(p.StartingIndex),
-							parcelSamplesToSend,
-						)
+						parcelSamplesToSend := make([]byte, p.SampleCount*512)
 
-						if putErr != nil {
-							stats.PutLatencies = append(stats.PutLatencies, time.Since(putStartTime))
-							stats.PutTimestamps = append(stats.PutTimestamps, time.Now().Format("15:04:05.000000"))
-							stats.BlockIDs = append(stats.BlockIDs, fmt.Sprint(blockID))
-							stats.ParcelIDs = append(stats.ParcelIDs, fmt.Sprint(p.StartingIndex))
-							stats.ParcelStatuses = append(stats.ParcelStatuses, "fail")
-
-							stats.TotalFailedPuts += 1
-							stats.TotalPutMessages += 1
-						} else {
-							stats.PutLatencies = append(stats.PutLatencies, time.Since(putStartTime))
-							stats.PutTimestamps = append(stats.PutTimestamps, time.Now().Format("15:04:05.000000"))
-							stats.BlockIDs = append(stats.BlockIDs, fmt.Sprint(blockID))
-							stats.ParcelIDs = append(stats.ParcelIDs, fmt.Sprint(p.StartingIndex))
-							stats.ParcelStatuses = append(stats.ParcelStatuses, "success")
-
-							seededParcelIDs = append(seededParcelIDs, p.StartingIndex)
-
-							stats.TotalSuccessPuts += 1
-							stats.TotalPutMessages += 1
+						parcelType := "row"
+						if !p.IsRow {
+							parcelType = "col"
 						}
-					}
 
-				}(parcel)
+						for !contains(seededParcelIDs, p.StartingIndex) {
+							putStartTime := time.Now()
+							putErr := dht.PutValue(
+								ctx,
+								"/das/sample/"+fmt.Sprint(blockID)+"/"+parcelType+"/"+fmt.Sprint(p.StartingIndex),
+								parcelSamplesToSend,
+							)
+
+							if putErr != nil {
+
+								stats.PutLatencies = append(stats.PutLatencies, time.Since(putStartTime))
+								stats.PutTimestamps = append(stats.PutTimestamps, time.Now().Format("15:04:05.000000"))
+								stats.BlockIDs = append(stats.BlockIDs, fmt.Sprint(blockID))
+								stats.ParcelIDs = append(stats.ParcelIDs, fmt.Sprint(p.StartingIndex))
+								stats.ParcelStatuses = append(stats.ParcelStatuses, "fail")
+
+								stats.TotalFailedPuts += 1
+								stats.TotalPutMessages += 1
+							} else {
+
+								stats.PutLatencies = append(stats.PutLatencies, time.Since(putStartTime))
+								stats.PutTimestamps = append(stats.PutTimestamps, time.Now().Format("15:04:05.000000"))
+								stats.BlockIDs = append(stats.BlockIDs, fmt.Sprint(blockID))
+								stats.ParcelIDs = append(stats.ParcelIDs, fmt.Sprint(p.StartingIndex))
+								stats.ParcelStatuses = append(stats.ParcelStatuses, "success")
+
+								stats.TotalSuccessPuts += 1
+								stats.TotalPutMessages += 1
+
+								seededParcelIDs = append(seededParcelIDs, p.StartingIndex)
+							}
+						}
+					}(parcel)
+				}
+
+				parcelWg.Wait()
+
+				elapsedTime := time.Since(startTime)
+				stats.SeedingLatencies = append(stats.SeedingLatencies, elapsedTime)
+
+				log.Printf("[B - %s] Finished seeding block %d in %s\n", s.host.ID()[0:5].Pretty(), blockID, elapsedTime)
+				blockID++
 			}
-			parcelWg.Wait()
-
-			stats.SeedingLatencies = append(stats.SeedingLatencies, time.Since(startTime))
-
-			log.Printf("[B - %s] All seeding took %.2f seconds.\n", s.host.ID()[0:5].Pretty(), time.Since(startTime).Seconds())
-		}
+		}()
+		wg.Wait()
 
 		log.Printf("[B - %s] Finished seeding %d blocks.\n", s.host.ID()[0:5].Pretty(), TOTAL_BLOCK_COUNT)
 
