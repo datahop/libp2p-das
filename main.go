@@ -66,8 +66,9 @@ type Stats struct {
 	PutTimestamps []string
 	GetTimestamps []string
 
-	BlockIDs  []string
-	ParcelIDs []string
+	BlockIDs       []string
+	ParcelIDs      []string
+	ParcelStatuses []string
 }
 
 var config Config
@@ -325,6 +326,12 @@ func writeLatencyStatsToFile(stats *Stats, h host.Host, nodeType string) (string
 			row = append(row, "")
 		}
 
+		if i < len(stats.ParcelStatuses) {
+			row = append(row, stats.ParcelStatuses[i])
+		} else {
+			row = append(row, "")
+		}
+
 		latencyRows = append(latencyRows, row)
 	}
 
@@ -338,7 +345,7 @@ func writeLatencyStatsToFile(stats *Stats, h host.Host, nodeType string) (string
 	w := csv.NewWriter(f)
 	defer w.Flush()
 
-	headers := []string{"Block Seeding Duration (us)", "PUT latencies (us)", "GET latencies (us)", "Row Sampling Latencies (us)", "Col Sampling Latencies (us)", "Random Sampling Latencies (us)", "Total Sampling Latencies (us)", "GET hops", "Block ID", "Parcel ID", "PUT timestamps", "GET timestamps"}
+	headers := []string{"Block Seeding Duration (us)", "PUT latencies (us)", "GET latencies (us)", "Row Sampling Latencies (us)", "Col Sampling Latencies (us)", "Random Sampling Latencies (us)", "Total Sampling Latencies (us)", "GET hops", "Block ID", "Parcel ID", "PUT timestamps", "GET timestamps", "Parcel Status"}
 	rows := latencyRows
 
 	// Write headers and rows to CSV file
