@@ -191,7 +191,7 @@ func (s *Service) StartMessaging(h host.Host, dht *dht.IpfsDHT, stats *Stats, pe
 		panic("Context is nil")
 	}
 
-	const ROW_COUNT = 512
+	const ROW_COUNT = 10
 	const TOTAL_BLOCK_COUNT = 5
 	const BLOCK_TIME_SEC = 12
 
@@ -346,9 +346,8 @@ func (s *Service) StartMessaging(h host.Host, dht *dht.IpfsDHT, stats *Stats, pe
 
 							stats.TotalFailedGets += 1
 							stats.TotalGetMessages += 1
-							// log.Printf("[V - %s] Failed to get parcel %d: %s\n", s.host.ID()[0:5].Pretty(), p.StartingIndex, err.Error())
+
 						} else {
-							// Log Stats
 							stats.GetLatencies = append(stats.GetLatencies, time.Since(getStartTime))
 							stats.GetHops = append(stats.GetHops, hops)
 							stats.GetTimestamps = append(stats.GetTimestamps, time.Now().Format("15:04:05.000000"))

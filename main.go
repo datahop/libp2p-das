@@ -252,7 +252,7 @@ func writeOperationsToFile(stats *Stats, h host.Host, nodeType string) (string, 
 
 	// Convert latencies and hops to rows
 	var operationRows [][]string
-	for i := 0; i < len(stats.BlockIDs) || i < len(stats.ParcelIDs) || i < len(stats.ParcelStatuses) || i < len(stats.PutTimestamps) || i < len(stats.GetTimestamps) || i < len(stats.GetHops); i++ {
+	for i := 0; i < len(stats.BlockIDs) || i < len(stats.ParcelIDs) || i < len(stats.ParcelStatuses) || i < len(stats.PutTimestamps) || i < len(stats.GetTimestamps) || i < len(stats.GetHops) || i < len(stats.PutLatencies) || i < len(stats.GetLatencies); i++ {
 		var row []string
 
 		if i < len(stats.BlockIDs) {
@@ -279,8 +279,20 @@ func writeOperationsToFile(stats *Stats, h host.Host, nodeType string) (string, 
 			row = append(row, "")
 		}
 
+		if i < len(stats.PutLatencies) {
+			row = append(row, strconv.FormatInt(stats.PutLatencies[i].Microseconds(), 10))
+		} else {
+			row = append(row, "")
+		}
+
 		if i < len(stats.GetTimestamps) {
 			row = append(row, stats.GetTimestamps[i])
+		} else {
+			row = append(row, "")
+		}
+
+		if i < len(stats.GetLatencies) {
+			row = append(row, strconv.FormatInt(stats.GetLatencies[i].Microseconds(), 10))
 		} else {
 			row = append(row, "")
 		}
@@ -304,7 +316,7 @@ func writeOperationsToFile(stats *Stats, h host.Host, nodeType string) (string, 
 	w := csv.NewWriter(f)
 	defer w.Flush()
 
-	headers := []string{"Block ID", "Parcel ID", "Parcel Status", "PUT timestamps", "GET timestamps", "GET hops"}
+	headers := []string{"Block ID", "Parcel ID", "Parcel Status", "PUT timestamps", "PUT latencies", "GET timestamps", "GET latencies", "GET hops"}
 	rows := operationRows
 
 	// Write headers and rows to CSV file
