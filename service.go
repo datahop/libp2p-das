@@ -191,7 +191,7 @@ func (s *Service) StartMessaging(h host.Host, dht *dht.IpfsDHT, stats *Stats, pe
 		panic("Context is nil")
 	}
 
-	const ROW_COUNT = 10
+	const ROW_COUNT = 512 // ? ROW_COUNTxROW_COUNT matrix
 	const TOTAL_BLOCK_COUNT = 5
 	const BLOCK_TIME_SEC = 12
 
@@ -202,15 +202,16 @@ func (s *Service) StartMessaging(h host.Host, dht *dht.IpfsDHT, stats *Stats, pe
 			time.Sleep(time.Second)
 		}
 
-		blockID := 0
 		ticker := time.NewTicker(BLOCK_TIME_SEC * time.Second)
 
 		var wg sync.WaitGroup
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
+			blockID := 0
 			for range ticker.C {
-				if blockID >= TOTAL_BLOCK_COUNT {
+				// Add an extra block to give everyone a chance to seed the last block
+				if blockID >= TOTAL_BLOCK_COUNT+1 {
 					ticker.Stop()
 					return
 				}
@@ -291,7 +292,7 @@ func (s *Service) StartMessaging(h host.Host, dht *dht.IpfsDHT, stats *Stats, pe
 
 	} else if peerType == "validator" {
 
-		for blockID := 0; blockID < TOTAL_BLOCK_COUNT; blockID++ {
+		for blockID := 0; blockID <= TOTAL_BLOCK_COUNT; blockID++ {
 
 			log.Printf("[V - %s] Starting to sample block %d...\n", s.host.ID()[0:5].Pretty(), blockID)
 
@@ -369,13 +370,13 @@ func (s *Service) StartMessaging(h host.Host, dht *dht.IpfsDHT, stats *Stats, pe
 
 			stats.TotalSamplingLatencies = append(stats.TotalSamplingLatencies, time.Since(startTime))
 
-			log.Printf("[V - %s] All sampling took %.2f seconds.\n", s.host.ID()[0:5].Pretty(), time.Since(startTime).Seconds())
+			log.Printf("[V - %s] Block %d sampling took %.2f seconds.\n", s.host.ID()[0:5].Pretty(), blockID, time.Since(startTime).Seconds())
 
 		}
 
 	} else if peerType == "nonvalidator" {
 
-		for blockID := 0; blockID < TOTAL_BLOCK_COUNT; blockID++ {
+		for blockID := 0; blockID <= TOTAL_BLOCK_COUNT; blockID++ {
 
 			log.Printf("[R - %s] Starting to sample block %d...\n", s.host.ID()[0:5].Pretty(), blockID)
 
@@ -454,7 +455,7 @@ func (s *Service) StartMessaging(h host.Host, dht *dht.IpfsDHT, stats *Stats, pe
 
 			stats.TotalSamplingLatencies = append(stats.TotalSamplingLatencies, time.Since(startTime))
 
-			log.Printf("[R - %s] All sampling took %.2f seconds.\n", s.host.ID()[0:5].Pretty(), time.Since(startTime).Seconds())
+			log.Printf("[R - %s] Block %d sampling took %.2f seconds.\n", s.host.ID()[0:5].Pretty(), blockID, time.Since(startTime).Seconds())
 
 		}
 
