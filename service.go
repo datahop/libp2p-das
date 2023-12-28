@@ -192,7 +192,7 @@ func (s *Service) StartMessaging(h host.Host, dht *dht.IpfsDHT, stats *Stats, pe
 	}
 
 	const ROW_COUNT = 512 // ? ROW_COUNTxROW_COUNT matrix
-	const TOTAL_BLOCK_COUNT = 3
+	const TOTAL_BLOCK_COUNT = 10
 	const BLOCK_TIME_SEC = 12
 
 	if peerType == "builder" {
@@ -271,6 +271,8 @@ func (s *Service) StartMessaging(h host.Host, dht *dht.IpfsDHT, stats *Stats, pe
 								stats.TotalPutMessages += 1
 
 								if putErr.Error() == "context deadline exceeded" {
+									break
+								} else if putErr.Error() == "failed to find any peer in table" {
 									break
 								} else {
 									log.Printf("[B - %s] Failed to put parcel %d: %s\n", s.host.ID()[0:5].Pretty(), p.StartingIndex, putErr.Error())
