@@ -39,6 +39,17 @@ type Config struct {
 }
 
 type Stats struct {
+	// Operations
+	BlockIDs       []string
+	ParcelIDs      []string
+	ParcelStatuses []string
+	PutTimestamps  []string
+	PutLatencies   []time.Duration
+	GetTimestamps  []string
+	GetLatencies   []time.Duration
+	GetHops        []int
+
+	// Total Stats
 	TotalPutMessages int
 	TotalFailedPuts  int
 	TotalSuccessPuts int
@@ -46,31 +57,12 @@ type Stats struct {
 	TotalFailedGets  int
 	TotalSuccessGets int
 
-	// ? How long it took the builder to put a block into DHT
-	SeedingLatencies []time.Duration
-
-	// ? Array of latencies for puts
-	PutLatencies []time.Duration
-	// ? Array of latencies for gets
-	GetLatencies []time.Duration
-	// ? How long it takes to get 2 rows
-	RowSamplingLatencies []time.Duration
-	// ? How long it takes to get 2 cols
-	ColSamplingLatencies []time.Duration
-	// ? How long it takes to get 75 random cells
+	// Latencies
+	SeedingLatencies        []time.Duration
+	RowSamplingLatencies    []time.Duration
+	ColSamplingLatencies    []time.Duration
 	RandomSamplingLatencies []time.Duration
-	// ? How long it took to sample everything
-	TotalSamplingLatencies []time.Duration
-
-	// ? Array of hops for gets
-	GetHops []int
-
-	PutTimestamps []string
-	GetTimestamps []string
-
-	BlockIDs       []string
-	ParcelIDs      []string
-	ParcelStatuses []string
+	TotalSamplingLatencies  []time.Duration
 }
 
 var config Config
@@ -205,6 +197,12 @@ func main() {
 
 	service.StartMessaging(h, dht, stats, nodeType, config.ParcelSize, ctx)
 
+	if filename, err := writeOperationsToFile(stats, h, nodeType); err != nil {
+		log.Fatal(err)
+	} else {
+		log.Printf("[%s - %s] Operations written to %s\n", nodeTypeSuffix, h.ID()[0:5].Pretty(), filename)
+	}
+
 	if filename, err := writeTotalStatsToFile(stats, h, nodeType); err != nil {
 		log.Fatal(err)
 	} else {
@@ -234,9 +232,80 @@ func writeTotalStatsToFile(stats *Stats, h host.Host, nodeType string) (string, 
 	defer w.Flush()
 
 	headers := []string{"Total PUT messages", "Total failed PUTs", "Total successful PUTs", "Total GET messages", "Total failed GETs", "Total successful GETs"}
+
 	rows := [][]string{
 		{strconv.Itoa(stats.TotalPutMessages), strconv.Itoa(stats.TotalFailedPuts), strconv.Itoa(stats.TotalSuccessPuts), strconv.Itoa(stats.TotalGetMessages), strconv.Itoa(stats.TotalFailedGets), strconv.Itoa(stats.TotalSuccessGets)},
 	}
+
+	// Write headers and rows to CSV file
+	w.Write(headers)
+	w.WriteAll(rows)
+	if err := w.Error(); err != nil {
+		return filename, err
+	}
+
+	return filename, nil
+}
+
+func writeOperationsToFile(stats *Stats, h host.Host, nodeType string) (string, error) {
+	filename := h.ID()[0:10].Pretty() + "_operations_" + nodeType + ".csv"
+
+	// Convert latencies and hops to rows
+	var operationRows [][]string
+	for i := 0; i < len(stats.BlockIDs) || i < len(stats.ParcelIDs) || i < len(stats.ParcelStatuses) || i < len(stats.PutTimestamps) || i < len(stats.GetTimestamps) || i < len(stats.GetHops); i++ {
+		var row []string
+
+		if i < len(stats.BlockIDs) {
+			row = append(row, stats.BlockIDs[i])
+		} else {
+			row = append(row, "")
+		}
+
+		if i < len(stats.ParcelIDs) {
+			row = append(row, stats.ParcelIDs[i])
+		} else {
+			row = append(row, "")
+		}
+
+		if i < len(stats.ParcelStatuses) {
+			row = append(row, stats.ParcelStatuses[i])
+		} else {
+			row = append(row, "")
+		}
+
+		if i < len(stats.PutTimestamps) {
+			row = append(row, stats.PutTimestamps[i])
+		} else {
+			row = append(row, "")
+		}
+
+		if i < len(stats.GetTimestamps) {
+			row = append(row, stats.GetTimestamps[i])
+		} else {
+			row = append(row, "")
+		}
+
+		if i < len(stats.GetHops) {
+			row = append(row, strconv.Itoa(stats.GetHops[i]))
+		} else {
+			row = append(row, "")
+		}
+
+		operationRows = append(operationRows, row)
+	}
+
+	// Write latency stats to CSV file
+	f, err := os.Create(filename)
+	if err != nil {
+		return filename, err
+	}
+	defer f.Close()
+
+	w := csv.NewWriter(f)
+	defer w.Flush()
+
+	headers := []string{"Block ID", "Parcel ID", "Parcel Status", "PUT timestamps", "GET timestamps", "GET hops"}
+	rows := operationRows
 
 	// Write headers and rows to CSV file
 	w.Write(headers)
@@ -253,23 +322,12 @@ func writeLatencyStatsToFile(stats *Stats, h host.Host, nodeType string) (string
 
 	// Convert latencies and hops to rows
 	var latencyRows [][]string
-	for i := 0; i < len(stats.SeedingLatencies) || i < len(stats.PutLatencies) || i < len(stats.GetLatencies) || i < len(stats.GetHops) || i < len(stats.TotalSamplingLatencies); i++ {
+
+	for i := 0; i < len(stats.SeedingLatencies) || i < len(stats.RowSamplingLatencies) || i < len(stats.ColSamplingLatencies) || i < len(stats.RandomSamplingLatencies) || i < len(stats.TotalSamplingLatencies); i++ {
 		var row []string
 
 		if i < len(stats.SeedingLatencies) {
 			row = append(row, strconv.FormatInt(stats.SeedingLatencies[i].Microseconds(), 10))
-		} else {
-			row = append(row, "")
-		}
-
-		if i < len(stats.PutLatencies) {
-			row = append(row, strconv.FormatInt(stats.PutLatencies[i].Microseconds(), 10))
-		} else {
-			row = append(row, "")
-		}
-
-		if i < len(stats.GetLatencies) {
-			row = append(row, strconv.FormatInt(stats.GetLatencies[i].Microseconds(), 10))
 		} else {
 			row = append(row, "")
 		}
@@ -298,42 +356,6 @@ func writeLatencyStatsToFile(stats *Stats, h host.Host, nodeType string) (string
 			row = append(row, "")
 		}
 
-		if i < len(stats.GetHops) {
-			row = append(row, strconv.Itoa(stats.GetHops[i]))
-		} else {
-			row = append(row, "")
-		}
-
-		if i < len(stats.BlockIDs) {
-			row = append(row, stats.BlockIDs[i])
-		} else {
-			row = append(row, "")
-		}
-
-		if i < len(stats.ParcelIDs) {
-			row = append(row, stats.ParcelIDs[i])
-		} else {
-			row = append(row, "")
-		}
-
-		if i < len(stats.PutTimestamps) {
-			row = append(row, stats.PutTimestamps[i])
-		} else {
-			row = append(row, "")
-		}
-
-		if i < len(stats.GetTimestamps) {
-			row = append(row, stats.GetTimestamps[i])
-		} else {
-			row = append(row, "")
-		}
-
-		if i < len(stats.ParcelStatuses) {
-			row = append(row, stats.ParcelStatuses[i])
-		} else {
-			row = append(row, "")
-		}
-
 		latencyRows = append(latencyRows, row)
 	}
 
@@ -347,7 +369,7 @@ func writeLatencyStatsToFile(stats *Stats, h host.Host, nodeType string) (string
 	w := csv.NewWriter(f)
 	defer w.Flush()
 
-	headers := []string{"Block Seeding Duration (us)", "PUT latencies (us)", "GET latencies (us)", "Row Sampling Latencies (us)", "Col Sampling Latencies (us)", "Random Sampling Latencies (us)", "Total Sampling Latencies (us)", "GET hops", "Block ID", "Parcel ID", "PUT timestamps", "GET timestamps", "Parcel Status"}
+	headers := []string{"Seeding Latency (us)", "Row Sampling Latency (us)", "Col Sampling Latency (us)", "Random Sampling Latency (us)", "Total Sampling Latency (us)"}
 	rows := latencyRows
 
 	// Write headers and rows to CSV file
