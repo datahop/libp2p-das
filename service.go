@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"math/rand"
+	"strings"
 	"sync"
 	"time"
 
@@ -192,7 +193,7 @@ func (s *Service) StartMessaging(h host.Host, dht *dht.IpfsDHT, stats *Stats, pe
 	}
 
 	const ROW_COUNT = 512 // ? ROW_COUNTxROW_COUNT matrix
-	const TOTAL_BLOCK_COUNT = 10
+	const TOTAL_BLOCK_COUNT = 3
 	const BLOCK_TIME_SEC = 12
 
 	if peerType == "builder" {
@@ -216,7 +217,18 @@ func (s *Service) StartMessaging(h host.Host, dht *dht.IpfsDHT, stats *Stats, pe
 					return
 				}
 
-				log.Printf("[B - %s] Starting to seed block %d...\n", s.host.ID()[0:5].Pretty(), blockID)
+				// Send block start signal
+				putErr := dht.PutValue(
+					ctx,
+					"/das/block/"+fmt.Sprint(blockID),
+					make([]byte, 1),
+				)
+
+				if putErr != nil {
+					log.Printf("[B - %s] Failed to put block start signal: %s\n", s.host.ID()[0:5].Pretty(), putErr.Error())
+				} else {
+					log.Printf("[B - %s] Starting to seed block %d...\n", s.host.ID()[0:5].Pretty(), blockID)
+				}
 
 				startTime := time.Now()
 
@@ -312,6 +324,27 @@ func (s *Service) StartMessaging(h host.Host, dht *dht.IpfsDHT, stats *Stats, pe
 	} else if peerType == "validator" {
 
 		for blockID := 0; blockID <= TOTAL_BLOCK_COUNT; blockID++ {
+
+			hasFoundBlockStart := false
+			for !hasFoundBlockStart {
+
+				_, _, err := dht.GetValueHops(
+					ctx,
+					"/das/block/"+fmt.Sprint(blockID),
+				)
+
+				if err != nil {
+
+					if !strings.Contains(err.Error(), "routing: not found") {
+						log.Printf("[V - %s] Failed to get block %d start signal: %s\n", s.host.ID()[0:5].Pretty(), blockID, err.Error())
+					}
+
+					time.Sleep(time.Millisecond * 100)
+				} else {
+					hasFoundBlockStart = true
+					log.Printf("[V - %s] Found block %d start signal.\n", s.host.ID()[0:5].Pretty(), blockID)
+				}
+			}
 
 			startTime := time.Now()
 
@@ -415,6 +448,28 @@ func (s *Service) StartMessaging(h host.Host, dht *dht.IpfsDHT, stats *Stats, pe
 	} else if peerType == "nonvalidator" {
 
 		for blockID := 0; blockID <= TOTAL_BLOCK_COUNT; blockID++ {
+
+			hasFoundBlockStart := false
+			for !hasFoundBlockStart {
+
+				_, _, err := dht.GetValueHops(
+					ctx,
+					"/das/block/"+fmt.Sprint(blockID),
+				)
+
+				if err != nil {
+
+					if !strings.Contains(err.Error(), "routing: not found") {
+						log.Printf("[V - %s] Failed to get block %d start signal: %s\n", s.host.ID()[0:5].Pretty(), blockID, err.Error())
+					}
+
+					time.Sleep(time.Millisecond * 100)
+				} else {
+					hasFoundBlockStart = true
+					log.Printf("[V - %s] Found block %d start signal.\n", s.host.ID()[0:5].Pretty(), blockID)
+				}
+			}
+
 			startTime := time.Now()
 
 			log.Printf("[R - %s] Starting to sample block %d...\n", s.host.ID()[0:5].Pretty(), blockID)
