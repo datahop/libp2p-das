@@ -196,6 +196,12 @@ func (s *Service) StartMessaging(h host.Host, dht *dht.IpfsDHT, stats *Stats, pe
 	const TOTAL_BLOCK_COUNT = 3
 	const BLOCK_TIME_SEC = 12
 
+	// Check if ROW_COUNT is divisible by parcelSize
+	if ROW_COUNT%parcelSize != 0 {
+		log.Printf("ROW_COUNT of %d is not divisible by parcelSize of %d", ROW_COUNT, parcelSize)
+		return
+	}
+
 	if peerType == "builder" {
 
 		for len(dht.RoutingTable().ListPeers()) == 0 {
