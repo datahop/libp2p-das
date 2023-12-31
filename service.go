@@ -234,6 +234,13 @@ func (s *Service) StartMessaging(h host.Host, dht *dht.IpfsDHT, stats *Stats, pe
 					log.Printf("[B - %s] Failed to put block start signal: %s\n", s.host.ID()[0:5].Pretty(), putErr.Error())
 				} else {
 					log.Printf("[B - %s] Starting to seed block %d...\n", s.host.ID()[0:5].Pretty(), blockID)
+
+					// Record the starting signal as a parcel with id -1
+					stats.PutLatencies = append(stats.PutLatencies, time.Since(time.Now()))
+					stats.PutTimestamps = append(stats.PutTimestamps, time.Now().Format("15:04:05.000000"))
+					stats.BlockIDs = append(stats.BlockIDs, fmt.Sprint(blockID))
+					stats.ParcelIDs = append(stats.ParcelIDs, "-1")
+					stats.ParcelStatuses = append(stats.ParcelStatuses, "success")
 				}
 
 				startTime := time.Now()
@@ -349,6 +356,14 @@ func (s *Service) StartMessaging(h host.Host, dht *dht.IpfsDHT, stats *Stats, pe
 				} else {
 					hasFoundBlockStart = true
 					log.Printf("[V - %s] Found block %d start signal.\n", s.host.ID()[0:5].Pretty(), blockID)
+
+					// Record the starting signal as a parcel with id -1
+					stats.GetLatencies = append(stats.GetLatencies, time.Since(time.Now()))
+					stats.GetHops = append(stats.GetHops, 0)
+					stats.GetTimestamps = append(stats.GetTimestamps, time.Now().Format("15:04:05.000000"))
+					stats.BlockIDs = append(stats.BlockIDs, fmt.Sprint(blockID))
+					stats.ParcelIDs = append(stats.ParcelIDs, "-1")
+					stats.ParcelStatuses = append(stats.ParcelStatuses, "success")
 				}
 			}
 
@@ -473,6 +488,14 @@ func (s *Service) StartMessaging(h host.Host, dht *dht.IpfsDHT, stats *Stats, pe
 				} else {
 					hasFoundBlockStart = true
 					log.Printf("[V - %s] Found block %d start signal.\n", s.host.ID()[0:5].Pretty(), blockID)
+
+					// Record the starting signal as a parcel with id -1
+					stats.GetLatencies = append(stats.GetLatencies, time.Since(time.Now()))
+					stats.GetHops = append(stats.GetHops, 0)
+					stats.GetTimestamps = append(stats.GetTimestamps, time.Now().Format("15:04:05.000000"))
+					stats.BlockIDs = append(stats.BlockIDs, fmt.Sprint(blockID))
+					stats.ParcelIDs = append(stats.ParcelIDs, "-1")
+					stats.ParcelStatuses = append(stats.ParcelStatuses, "success")
 				}
 			}
 
