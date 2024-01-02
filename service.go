@@ -392,10 +392,25 @@ func (s *Service) StartMessaging(h host.Host, dht *dht.IpfsDHT, stats *Stats, pe
 
 			startTime := time.Now()
 
-			log.Printf("[V - %s] Starting to sample block %d...\n", s.host.ID()[0:5].Pretty(), blockID)
+			samplesPerRow := ROW_COUNT / 2
+			rowColParcelsNeededCount := samplesPerRow / parcelSize
 
-			rowColParcelsNeededCount := (ROW_COUNT / 2) / parcelSize
+			if samplesPerRow%parcelSize != 0 {
+				rowColParcelsNeededCount++
+			}
+
 			randomParcelsNeededCount := 75
+
+			log.Printf("[V - %s] ROW_COUNT: %d, parcelSize: %d, \n\t\t(ROW_COUNT / 2) / parcelSize \n\t\t = (%d / 2) / %d \n\t\t = %d / %d\n\t\t = %d\n",
+				s.host.ID()[0:5].Pretty(),
+				ROW_COUNT,
+				parcelSize,
+				ROW_COUNT,
+				parcelSize,
+				samplesPerRow,
+				parcelSize,
+				rowColParcelsNeededCount,
+			)
 
 			allParcels := SplitSamplesIntoParcels(ROW_COUNT, parcelSize, "all")
 			rowParcels := SplitSamplesIntoParcels(ROW_COUNT, parcelSize, "row")
@@ -413,8 +428,20 @@ func (s *Service) StartMessaging(h host.Host, dht *dht.IpfsDHT, stats *Stats, pe
 				allRandomParcels[i], allRandomParcels[j] = allRandomParcels[j], allRandomParcels[i]
 			})
 
-			sampledParcelIDs := make([]int, 0)
+			log.Printf(
+				"[V - %s] Sampling %d parcels (%d/%d Rows, %d/%d Cols, %d/%d All) for Block %d...\n",
+				s.host.ID()[0:5].Pretty(),
+				len(allRandomParcels),
+				len(randomRowParcels),
+				rowColParcelsNeededCount,
+				len(randomColParcels),
+				rowColParcelsNeededCount,
+				len(randomParcels),
+				randomParcelsNeededCount,
+				blockID,
+			)
 
+			sampledParcelIDs := make([]int, 0)
 			var parcelWg sync.WaitGroup
 			for _, parcel := range allRandomParcels {
 				parcelWg.Add(1)
@@ -645,6 +672,11 @@ func pickRandomParcels(parcels []Parcel, requiredCount int) []Parcel {
 		if !alreadyPicked {
 			randomParcels = append(randomParcels, randomParcel)
 		}
+	}
+
+	if len(randomParcels) != requiredCount {
+		log.Printf("Random parcel count of %d does not match the required count of %d", len(randomParcels), requiredCount)
+		panic("Random parcel count does not match the required count")
 	}
 
 	return randomParcels
