@@ -3,6 +3,8 @@
 rm -rf ./*_builder.csv
 rm -rf ./*_validator.csv
 rm -rf ./*_nonvalidator.csv
+rm -rf ./startingIndexes*.csv
+rm -rf ./randomParcel*.csv
 
 if [ -z "$1" ] || [ -z "$2" ] || [ -z "$3" ] || [ -z "$4" ]; then
     echo "There should be 4 parameters: builderCount, validatorCount, nonValidatorCount, and parcelSize. e.g. test.sh 1 2 1 512"
