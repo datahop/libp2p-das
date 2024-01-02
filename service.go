@@ -63,6 +63,8 @@ func SplitSamplesIntoParcels(RowCount, parcelSize int, parcelType string) []Parc
 	TotalSamplesCount := RowCount * RowCount
 	parcels := make([]Parcel, 0)
 
+	TotalParcelsRequiredCount := (RowCount * (RowCount / parcelSize)) * 2
+
 	// Split the samples into row parcels
 	for i := 0; i < TotalSamplesCount; i += parcelSize {
 		parcel := Parcel{
@@ -99,6 +101,11 @@ func SplitSamplesIntoParcels(RowCount, parcelSize int, parcelType string) []Parc
 
 	if parcelType == "all" {
 
+		if len(parcels) != TotalParcelsRequiredCount {
+			log.Printf("TotalParcelsRequiredCount of %d does not match the number of parcels of %d", TotalParcelsRequiredCount, len(parcels))
+			panic("TotalParcelsRequiredCount does not match the number of parcels")
+		}
+
 		return parcels
 
 	} else if parcelType == "row" {
@@ -109,6 +116,12 @@ func SplitSamplesIntoParcels(RowCount, parcelSize int, parcelType string) []Parc
 				rowParcels = append(rowParcels, parcel)
 			}
 		}
+
+		if len(rowParcels) != TotalParcelsRequiredCount/2 {
+			log.Printf("TotalParcelsRequiredCount of %d does not match the number of parcels of %d", TotalParcelsRequiredCount/2, len(rowParcels))
+			panic("TotalParcelsRequiredCount does not match the number of parcels")
+		}
+
 		return rowParcels
 
 	} else if parcelType == "col" {
@@ -119,8 +132,17 @@ func SplitSamplesIntoParcels(RowCount, parcelSize int, parcelType string) []Parc
 				colParcels = append(colParcels, parcel)
 			}
 		}
+		if len(colParcels) != TotalParcelsRequiredCount/2 {
+			log.Printf("TotalParcelsRequiredCount of %d does not match the number of parcels of %d", TotalParcelsRequiredCount/2, len(colParcels))
+			panic("TotalParcelsRequiredCount does not match the number of parcels")
+		}
 		return colParcels
 
+	}
+
+	if len(parcels) != TotalParcelsRequiredCount {
+		log.Printf("TotalParcelsRequiredCount of %d does not match the number of parcels of %d", TotalParcelsRequiredCount, len(parcels))
+		panic("TotalParcelsRequiredCount does not match the number of parcels")
 	}
 
 	return parcels
