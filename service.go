@@ -274,8 +274,9 @@ func (s *Service) StartMessaging(h host.Host, dht *dht.IpfsDHT, stats *Stats, pe
 					allParcels[i], allParcels[j] = allParcels[j], allParcels[i]
 				})
 
-				seededParcelIDs := make([]int, 0)
+				log.Printf("[B - %s] Seeding %d parcels for block %d...\n", s.host.ID()[0:5].Pretty(), len(allParcels), blockID)
 
+				seededParcelIDs := make([]int, 0)
 				var parcelWg sync.WaitGroup
 				for _, parcel := range allParcels {
 					parcelWg.Add(1)
@@ -348,7 +349,7 @@ func (s *Service) StartMessaging(h host.Host, dht *dht.IpfsDHT, stats *Stats, pe
 				elapsedTime := time.Since(startTime)
 				stats.SeedingLatencies = append(stats.SeedingLatencies, elapsedTime)
 
-				log.Printf("[B - %s] Finished seeding block %d in %s\n", s.host.ID()[0:5].Pretty(), blockID, elapsedTime)
+				log.Printf("[B - %s] Finished seeding block %d in %s (%d/%d)\n", s.host.ID()[0:5].Pretty(), blockID, elapsedTime, stats.TotalSuccessPuts, stats.TotalPutMessages)
 				blockID++
 			}
 		}()
