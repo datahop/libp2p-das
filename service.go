@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"math/rand"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -401,16 +402,16 @@ func (s *Service) StartMessaging(h host.Host, dht *dht.IpfsDHT, stats *Stats, pe
 
 			randomParcelsNeededCount := 75
 
-			log.Printf("[V - %s] ROW_COUNT: %d, parcelSize: %d, \n\t\t(ROW_COUNT / 2) / parcelSize \n\t\t = (%d / 2) / %d \n\t\t = %d / %d\n\t\t = %d\n",
-				s.host.ID()[0:5].Pretty(),
-				ROW_COUNT,
-				parcelSize,
-				ROW_COUNT,
-				parcelSize,
-				samplesPerRow,
-				parcelSize,
-				rowColParcelsNeededCount,
-			)
+			// log.Printf("[V - %s] ROW_COUNT: %d, parcelSize: %d, \n\t\t(ROW_COUNT / 2) / parcelSize \n\t\t = (%d / 2) / %d \n\t\t = %d / %d\n\t\t = %d\n",
+			// 	s.host.ID()[0:5].Pretty(),
+			// 	ROW_COUNT,
+			// 	parcelSize,
+			// 	ROW_COUNT,
+			// 	parcelSize,
+			// 	samplesPerRow,
+			// 	parcelSize,
+			// 	rowColParcelsNeededCount,
+			// )
 
 			allParcels := SplitSamplesIntoParcels(ROW_COUNT, parcelSize, "all")
 			rowParcels := SplitSamplesIntoParcels(ROW_COUNT, parcelSize, "row")
@@ -539,11 +540,11 @@ func (s *Service) StartMessaging(h host.Host, dht *dht.IpfsDHT, stats *Stats, pe
 					hasFoundBlockStart = true
 					log.Printf("[V - %s] Found block %d start signal.\n", s.host.ID()[0:5].Pretty(), blockID)
 
-					// Record the starting signal as a parcel with id -1
 					stats.GetLatencies = append(stats.GetLatencies, time.Since(time.Now()))
 					stats.GetHops = append(stats.GetHops, 0)
 					stats.GetTimestamps = append(stats.GetTimestamps, time.Now().Format("15:04:05.000000"))
 					stats.BlockIDs = append(stats.BlockIDs, fmt.Sprint(blockID))
+					// Record the starting signal as a parcel with id -1
 					stats.ParcelIDs = append(stats.ParcelIDs, "-1")
 					stats.ParcelStatuses = append(stats.ParcelStatuses, "success")
 				}
@@ -553,29 +554,27 @@ func (s *Service) StartMessaging(h host.Host, dht *dht.IpfsDHT, stats *Stats, pe
 
 			log.Printf("[R - %s] Starting to sample block %d...\n", s.host.ID()[0:5].Pretty(), blockID)
 
-			rowColParcelsNeededCount := (ROW_COUNT / 2) / parcelSize
 			randomParcelsNeededCount := 75
 
 			allParcels := SplitSamplesIntoParcels(ROW_COUNT, parcelSize, "all")
-			rowParcels := SplitSamplesIntoParcels(ROW_COUNT, parcelSize, "row")
-			colParcels := SplitSamplesIntoParcels(ROW_COUNT, parcelSize, "col")
 
-			randomRowParcels := pickRandomParcels(rowParcels, rowColParcelsNeededCount)
-			randomColParcels := pickRandomParcels(colParcels, rowColParcelsNeededCount)
 			randomParcels := pickRandomParcels(allParcels, randomParcelsNeededCount)
 
-			allRandomParcels := append(randomRowParcels, randomColParcels...)
-			allRandomParcels = append(allRandomParcels, randomParcels...)
-
 			// Randomize allRandomParcels
-			rand.Shuffle(len(allRandomParcels), func(i, j int) {
-				allRandomParcels[i], allRandomParcels[j] = allRandomParcels[j], allRandomParcels[i]
+			rand.Shuffle(len(randomParcels), func(i, j int) {
+				randomParcels[i], randomParcels[j] = randomParcels[j], randomParcels[i]
 			})
 
-			sampledParcelIDs := make([]int, 0)
+			log.Printf(
+				"[R - %s] Sampling %d random parcels for Block %d...\n",
+				s.host.ID()[0:5].Pretty(),
+				len(randomParcels),
+				blockID,
+			)
 
+			sampledParcelIDs := make([]int, 0)
 			var parcelWg sync.WaitGroup
-			for _, parcel := range allRandomParcels {
+			for _, parcel := range randomParcels {
 				parcelWg.Add(1)
 				go func(p Parcel, blockID int) {
 					defer parcelWg.Done()
@@ -653,25 +652,34 @@ func (s *Service) StartMessaging(h host.Host, dht *dht.IpfsDHT, stats *Stats, pe
 	}
 }
 
+func sortParcelsByStartingIndex(parcels []Parcel) {
+	// We'll use the sort.Slice function to sort the parcels based on StartingIndex
+	sort.Slice(parcels, func(i, j int) bool {
+		return parcels[i].StartingIndex < parcels[j].StartingIndex
+	})
+}
+
 func pickRandomParcels(parcels []Parcel, requiredCount int) []Parcel {
-	randomParcels := make([]Parcel, 0)
+
+	// Create a new source of randomness based on the current time
+	source := rand.NewSource(time.Now().UnixNano())
+
+	// Create a new random number generator using the source
+	randomGenerator := rand.New(source)
+
+	sortParcelsByStartingIndex(parcels)
+
+	// Check if the requiredCount is greater than the total number of parcels
+	if requiredCount >= len(parcels) {
+		return parcels // Return all parcels if requiredCount is greater or equal
+	}
+
+	// Create a slice to store the selected random parcels
+	randomParcels := make([]Parcel, requiredCount)
+
 	for i := 0; i < requiredCount; i++ {
-		randomIndex := rand.Intn(len(parcels))
-		randomParcel := parcels[randomIndex]
-
-		// ? Check if the random parcel has already been picked
-		alreadyPicked := false
-		for _, p := range randomParcels {
-			if p.StartingIndex == randomParcel.StartingIndex && p.IsRow == randomParcel.IsRow {
-				alreadyPicked = true
-				break
-			}
-		}
-
-		// ? If the random parcel has not been picked, add it to the list
-		if !alreadyPicked {
-			randomParcels = append(randomParcels, randomParcel)
-		}
+		randomIndex := randomGenerator.Intn(len(parcels))
+		randomParcels[i] = parcels[randomIndex]
 	}
 
 	if len(randomParcels) != requiredCount {
