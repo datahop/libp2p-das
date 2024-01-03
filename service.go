@@ -537,11 +537,12 @@ func (s *Service) StartMessaging(h host.Host, dht *dht.IpfsDHT, stats *Stats, pe
 			hasFoundBlockStart := false
 			for !hasFoundBlockStart {
 
+				getStartTime := time.Now()
 				_, _, err := dht.GetValueHops(
 					ctx,
 					"/das/block/"+fmt.Sprint(blockID),
 				)
-				getLatency := time.Since(time.Now())
+				getLatency := time.Since(getStartTime)
 				getTimestamp := time.Now().Format("15:04:05.000000")
 
 				if err != nil {
