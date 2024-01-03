@@ -40,14 +40,14 @@ type Config struct {
 
 type Stats struct {
 	// Operations
-	BlockIDs       []string
-	ParcelIDs      []string
-	ParcelStatuses []string
-	PutTimestamps  []string
-	PutLatencies   []time.Duration
-	GetTimestamps  []string
-	GetLatencies   []time.Duration
-	GetHops        []int
+	BlockIDs        []string
+	ParcelKeyHashes []string
+	ParcelStatuses  []string
+	PutTimestamps   []string
+	PutLatencies    []time.Duration
+	GetTimestamps   []string
+	GetLatencies    []time.Duration
+	GetHops         []int
 
 	// Total Stats
 	TotalPutMessages int
@@ -252,7 +252,7 @@ func writeOperationsToFile(stats *Stats, h host.Host, nodeType string) (string, 
 
 	// Convert latencies and hops to rows
 	var operationRows [][]string
-	for i := 0; i < len(stats.BlockIDs) || i < len(stats.ParcelIDs) || i < len(stats.ParcelStatuses) || i < len(stats.PutTimestamps) || i < len(stats.GetTimestamps) || i < len(stats.GetHops) || i < len(stats.PutLatencies) || i < len(stats.GetLatencies); i++ {
+	for i := 0; i < len(stats.BlockIDs) || i < len(stats.ParcelKeyHashes) || i < len(stats.ParcelStatuses) || i < len(stats.PutTimestamps) || i < len(stats.GetTimestamps) || i < len(stats.GetHops) || i < len(stats.PutLatencies) || i < len(stats.GetLatencies); i++ {
 		var row []string
 
 		if i < len(stats.BlockIDs) {
@@ -261,8 +261,8 @@ func writeOperationsToFile(stats *Stats, h host.Host, nodeType string) (string, 
 			row = append(row, "")
 		}
 
-		if i < len(stats.ParcelIDs) {
-			row = append(row, stats.ParcelIDs[i])
+		if i < len(stats.ParcelKeyHashes) {
+			row = append(row, stats.ParcelKeyHashes[i])
 		} else {
 			row = append(row, "")
 		}
@@ -316,7 +316,7 @@ func writeOperationsToFile(stats *Stats, h host.Host, nodeType string) (string, 
 	w := csv.NewWriter(f)
 	defer w.Flush()
 
-	headers := []string{"Block ID", "Parcel ID", "Parcel Status", "PUT timestamps", "PUT latencies", "GET timestamps", "GET latencies", "GET hops"}
+	headers := []string{"Block ID", "Parcel Key Hashes", "Parcel Status", "PUT timestamps", "PUT latencies", "GET timestamps", "GET latencies", "GET hops"}
 	rows := operationRows
 
 	// Write headers and rows to CSV file

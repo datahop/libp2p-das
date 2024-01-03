@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"crypto/sha256"
 	"fmt"
 	"log"
 	"math/rand"
@@ -262,7 +263,7 @@ func (s *Service) StartMessaging(h host.Host, dht *dht.IpfsDHT, stats *Stats, pe
 					stats.PutLatencies = append(stats.PutLatencies, time.Since(time.Now()))
 					stats.PutTimestamps = append(stats.PutTimestamps, time.Now().Format("15:04:05.000000"))
 					stats.BlockIDs = append(stats.BlockIDs, fmt.Sprint(blockID))
-					stats.ParcelIDs = append(stats.ParcelIDs, "-1")
+					stats.ParcelKeyHashes = append(stats.ParcelKeyHashes, "-1")
 					stats.ParcelStatuses = append(stats.ParcelStatuses, "success")
 				}
 
@@ -304,6 +305,9 @@ func (s *Service) StartMessaging(h host.Host, dht *dht.IpfsDHT, stats *Stats, pe
 								parcelSamplesToSend,
 							)
 
+							keyHash := sha256.Sum256([]byte("/das/sample/" + fmt.Sprint(blockID) + "/" + parcelType + "/" + fmt.Sprint(p.StartingIndex)))
+							keyHashString := fmt.Sprintf("%x", keyHash)
+
 							if putErr != nil {
 								parcelStatus := "fail"
 								if putErr.Error() == "context deadline exceeded" {
@@ -313,7 +317,7 @@ func (s *Service) StartMessaging(h host.Host, dht *dht.IpfsDHT, stats *Stats, pe
 								stats.PutLatencies = append(stats.PutLatencies, time.Since(putStartTime))
 								stats.PutTimestamps = append(stats.PutTimestamps, time.Now().Format("15:04:05.000000"))
 								stats.BlockIDs = append(stats.BlockIDs, fmt.Sprint(blockID))
-								stats.ParcelIDs = append(stats.ParcelIDs, fmt.Sprint(p.StartingIndex))
+								stats.ParcelKeyHashes = append(stats.ParcelKeyHashes, keyHashString)
 								stats.ParcelStatuses = append(stats.ParcelStatuses, parcelStatus)
 
 								stats.TotalFailedPuts += 1
@@ -333,7 +337,7 @@ func (s *Service) StartMessaging(h host.Host, dht *dht.IpfsDHT, stats *Stats, pe
 								stats.PutLatencies = append(stats.PutLatencies, time.Since(putStartTime))
 								stats.PutTimestamps = append(stats.PutTimestamps, time.Now().Format("15:04:05.000000"))
 								stats.BlockIDs = append(stats.BlockIDs, fmt.Sprint(blockID))
-								stats.ParcelIDs = append(stats.ParcelIDs, fmt.Sprint(p.StartingIndex))
+								stats.ParcelKeyHashes = append(stats.ParcelKeyHashes, keyHashString)
 								stats.ParcelStatuses = append(stats.ParcelStatuses, "success")
 
 								stats.TotalSuccessPuts += 1
@@ -381,12 +385,12 @@ func (s *Service) StartMessaging(h host.Host, dht *dht.IpfsDHT, stats *Stats, pe
 					hasFoundBlockStart = true
 					log.Printf("[V - %s] Found block %d start signal.\n", s.host.ID()[0:5].Pretty(), blockID)
 
-					// Record the starting signal as a parcel with id -1
+					// Record the starting signal as a parcel with hash "start"
 					stats.GetLatencies = append(stats.GetLatencies, time.Since(time.Now()))
 					stats.GetHops = append(stats.GetHops, 0)
 					stats.GetTimestamps = append(stats.GetTimestamps, time.Now().Format("15:04:05.000000"))
 					stats.BlockIDs = append(stats.BlockIDs, fmt.Sprint(blockID))
-					stats.ParcelIDs = append(stats.ParcelIDs, "-1")
+					stats.ParcelKeyHashes = append(stats.ParcelKeyHashes, "-1")
 					stats.ParcelStatuses = append(stats.ParcelStatuses, "success")
 				}
 			}
@@ -466,6 +470,9 @@ func (s *Service) StartMessaging(h host.Host, dht *dht.IpfsDHT, stats *Stats, pe
 							"/das/sample/"+fmt.Sprint(blockID)+"/"+parcelType+"/"+fmt.Sprint(p.StartingIndex),
 						)
 
+						keyHash := sha256.Sum256([]byte("/das/sample/" + fmt.Sprint(blockID) + "/" + parcelType + "/" + fmt.Sprint(p.StartingIndex)))
+						keyHashString := fmt.Sprintf("%x", keyHash)
+
 						if err != nil {
 							// log.Printf("[V - %s] Failed to get parcel %d: %s\n", s.host.ID()[0:5].Pretty(), p.StartingIndex, err.Error())
 
@@ -478,7 +485,7 @@ func (s *Service) StartMessaging(h host.Host, dht *dht.IpfsDHT, stats *Stats, pe
 							stats.GetHops = append(stats.GetHops, hops)
 							stats.GetTimestamps = append(stats.GetTimestamps, time.Now().Format("15:04:05.000000"))
 							stats.BlockIDs = append(stats.BlockIDs, fmt.Sprint(blockID))
-							stats.ParcelIDs = append(stats.ParcelIDs, fmt.Sprint(p.StartingIndex))
+							stats.ParcelKeyHashes = append(stats.ParcelKeyHashes, keyHashString)
 							stats.ParcelStatuses = append(stats.ParcelStatuses, parcelStatus)
 
 							stats.TotalFailedGets += 1
@@ -492,7 +499,7 @@ func (s *Service) StartMessaging(h host.Host, dht *dht.IpfsDHT, stats *Stats, pe
 							stats.GetHops = append(stats.GetHops, hops)
 							stats.GetTimestamps = append(stats.GetTimestamps, time.Now().Format("15:04:05.000000"))
 							stats.BlockIDs = append(stats.BlockIDs, fmt.Sprint(blockID))
-							stats.ParcelIDs = append(stats.ParcelIDs, fmt.Sprint(p.StartingIndex))
+							stats.ParcelKeyHashes = append(stats.ParcelKeyHashes, keyHashString)
 							stats.ParcelStatuses = append(stats.ParcelStatuses, "success")
 
 							stats.TotalGetMessages += 1
@@ -545,7 +552,7 @@ func (s *Service) StartMessaging(h host.Host, dht *dht.IpfsDHT, stats *Stats, pe
 					stats.GetTimestamps = append(stats.GetTimestamps, time.Now().Format("15:04:05.000000"))
 					stats.BlockIDs = append(stats.BlockIDs, fmt.Sprint(blockID))
 					// Record the starting signal as a parcel with id -1
-					stats.ParcelIDs = append(stats.ParcelIDs, "-1")
+					stats.ParcelKeyHashes = append(stats.ParcelKeyHashes, "-1")
 					stats.ParcelStatuses = append(stats.ParcelStatuses, "success")
 				}
 			}
@@ -596,6 +603,9 @@ func (s *Service) StartMessaging(h host.Host, dht *dht.IpfsDHT, stats *Stats, pe
 							"/das/sample/"+fmt.Sprint(blockID)+"/"+parcelType+"/"+fmt.Sprint(p.StartingIndex),
 						)
 
+						keyHash := sha256.Sum256([]byte("/das/sample/" + fmt.Sprint(blockID) + "/" + parcelType + "/" + fmt.Sprint(p.StartingIndex)))
+						keyHashString := fmt.Sprintf("%x", keyHash)
+
 						if err != nil {
 							// log.Printf("[V - %s] Failed to get parcel %d: %s\n", s.host.ID()[0:5].Pretty(), p.StartingIndex, err.Error())
 
@@ -608,7 +618,7 @@ func (s *Service) StartMessaging(h host.Host, dht *dht.IpfsDHT, stats *Stats, pe
 							stats.GetHops = append(stats.GetHops, hops)
 							stats.GetTimestamps = append(stats.GetTimestamps, time.Now().Format("15:04:05.000000"))
 							stats.BlockIDs = append(stats.BlockIDs, fmt.Sprint(blockID))
-							stats.ParcelIDs = append(stats.ParcelIDs, fmt.Sprint(p.StartingIndex))
+							stats.ParcelKeyHashes = append(stats.ParcelKeyHashes, keyHashString)
 							stats.ParcelStatuses = append(stats.ParcelStatuses, parcelStatus)
 
 							stats.TotalFailedGets += 1
@@ -623,7 +633,7 @@ func (s *Service) StartMessaging(h host.Host, dht *dht.IpfsDHT, stats *Stats, pe
 							stats.GetHops = append(stats.GetHops, hops)
 							stats.GetTimestamps = append(stats.GetTimestamps, time.Now().Format("15:04:05.000000"))
 							stats.BlockIDs = append(stats.BlockIDs, fmt.Sprint(blockID))
-							stats.ParcelIDs = append(stats.ParcelIDs, fmt.Sprint(p.StartingIndex))
+							stats.ParcelKeyHashes = append(stats.ParcelKeyHashes, keyHashString)
 							stats.ParcelStatuses = append(stats.ParcelStatuses, "success")
 
 							stats.TotalGetMessages += 1
