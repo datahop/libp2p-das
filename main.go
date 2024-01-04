@@ -43,9 +43,9 @@ type Stats struct {
 	BlockIDs        []string
 	ParcelKeyHashes []string
 	ParcelStatuses  []string
-	PutTimestamps   []string
+	PutTimestamps   []time.Time
 	PutLatencies    []time.Duration
-	GetTimestamps   []string
+	GetTimestamps   []time.Time
 	GetLatencies    []time.Duration
 	GetHops         []int
 
@@ -274,7 +274,7 @@ func writeOperationsToFile(stats *Stats, h host.Host, nodeType string) (string, 
 		}
 
 		if i < len(stats.PutTimestamps) {
-			row = append(row, stats.PutTimestamps[i])
+			row = append(row, stats.PutTimestamps[i].String())
 		} else {
 			row = append(row, "")
 		}
@@ -286,7 +286,7 @@ func writeOperationsToFile(stats *Stats, h host.Host, nodeType string) (string, 
 		}
 
 		if i < len(stats.GetTimestamps) {
-			row = append(row, stats.GetTimestamps[i])
+			row = append(row, stats.GetTimestamps[i].String())
 		} else {
 			row = append(row, "")
 		}

@@ -1,16 +1,18 @@
 module github.com/libp2p-das
 
-go 1.17
+go 1.21.5
 
 require (
-	github.com/Blitz3r123/go-libp2p-kad-dht v0.0.0-20230608150018-7269b838f58e
-	github.com/fatih/color v1.15.0
+	github.com/Blitz3r123/go-libp2p-kad-dht v1.0.0
 	github.com/libp2p/go-libp2p v0.13.0
 	github.com/libp2p/go-libp2p-core v0.8.0
 	github.com/libp2p/go-libp2p-discovery v0.5.0
 	github.com/libp2p/go-libp2p-gorpc v0.1.2
+	github.com/libp2p/go-libp2p-peerstore v0.2.6
 	github.com/multiformats/go-multiaddr v0.3.1
 )
+
+// replace github.com/Blitz3r123/go-libp2p-kad-dht => /Users/kaleem/go-libp2p-kad-dht
 
 require (
 	github.com/btcsuite/btcd v0.20.1-beta // indirect
@@ -50,7 +52,6 @@ require (
 	github.com/libp2p/go-libp2p-mplex v0.4.1 // indirect
 	github.com/libp2p/go-libp2p-nat v0.0.6 // indirect
 	github.com/libp2p/go-libp2p-noise v0.1.1 // indirect
-	github.com/libp2p/go-libp2p-peerstore v0.2.6 // indirect
 	github.com/libp2p/go-libp2p-pnet v0.2.0 // indirect
 	github.com/libp2p/go-libp2p-record v0.1.3 // indirect
 	github.com/libp2p/go-libp2p-swarm v0.4.0 // indirect
@@ -69,8 +70,6 @@ require (
 	github.com/libp2p/go-tcp-transport v0.2.1 // indirect
 	github.com/libp2p/go-ws-transport v0.4.0 // indirect
 	github.com/libp2p/go-yamux/v2 v2.0.0 // indirect
-	github.com/mattn/go-colorable v0.1.13 // indirect
-	github.com/mattn/go-isatty v0.0.17 // indirect
 	github.com/minio/blake2b-simd v0.0.0-20160723061019-3f5f724cb5b1 // indirect
 	github.com/minio/sha256-simd v0.1.1 // indirect
 	github.com/mr-tron/base58 v1.2.0 // indirect
