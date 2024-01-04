@@ -40,14 +40,16 @@ type Config struct {
 
 type Stats struct {
 	// Operations
-	BlockIDs        []string
-	ParcelKeyHashes []string
-	ParcelStatuses  []string
-	PutTimestamps   []time.Time
-	PutLatencies    []time.Duration
-	GetTimestamps   []time.Time
-	GetLatencies    []time.Duration
-	GetHops         []int
+	BlockIDs          []string
+	ParcelKeyHashes   []string
+	ParcelStatuses    []string
+	ParcelDataLengths []int
+	PutTimestamps     []time.Time
+	PutLatencies      []time.Duration
+	GetTimestamps     []time.Time
+	GetLatencies      []time.Duration
+
+	GetHops []int
 
 	// Total Stats
 	TotalPutMessages int
@@ -252,7 +254,7 @@ func writeOperationsToFile(stats *Stats, h host.Host, nodeType string) (string, 
 
 	// Convert latencies and hops to rows
 	var operationRows [][]string
-	for i := 0; i < len(stats.BlockIDs) || i < len(stats.ParcelKeyHashes) || i < len(stats.ParcelStatuses) || i < len(stats.PutTimestamps) || i < len(stats.GetTimestamps) || i < len(stats.GetHops) || i < len(stats.PutLatencies) || i < len(stats.GetLatencies); i++ {
+	for i := 0; i < len(stats.BlockIDs) || i < len(stats.ParcelKeyHashes) || i < len(stats.ParcelStatuses) || i < len(stats.ParcelDataLengths) || i < len(stats.PutTimestamps) || i < len(stats.GetTimestamps) || i < len(stats.GetHops) || i < len(stats.PutLatencies) || i < len(stats.GetLatencies); i++ {
 		var row []string
 
 		if i < len(stats.BlockIDs) {
@@ -269,6 +271,12 @@ func writeOperationsToFile(stats *Stats, h host.Host, nodeType string) (string, 
 
 		if i < len(stats.ParcelStatuses) {
 			row = append(row, stats.ParcelStatuses[i])
+		} else {
+			row = append(row, "")
+		}
+
+		if i < len(stats.ParcelDataLengths) {
+			row = append(row, strconv.Itoa(stats.ParcelDataLengths[i]))
 		} else {
 			row = append(row, "")
 		}
@@ -316,7 +324,7 @@ func writeOperationsToFile(stats *Stats, h host.Host, nodeType string) (string, 
 	w := csv.NewWriter(f)
 	defer w.Flush()
 
-	headers := []string{"Block ID", "Parcel Key Hashes", "Parcel Status", "PUT timestamps", "PUT latencies", "GET timestamps", "GET latencies", "GET hops"}
+	headers := []string{"Block ID", "Parcel Key Hashes", "Parcel Status", "Parcel Data Length (Bytes)", "PUT timestamps", "PUT latencies", "GET timestamps", "GET latencies", "GET hops"}
 	rows := operationRows
 
 	// Write headers and rows to CSV file
@@ -454,36 +462,3 @@ func waitForBuilder(wg *sync.WaitGroup, discoveryPeers addrList, h host.Host, dh
 	log.Printf("Could not connect to any bootstrap nodes...")
 
 }
-
-// func onPeerConnected(h host.Host, remote_peer_id peer.ID, dht *dht.IpfsDHT) (returningDht *dht.IpfsDHT) {
-
-// 	node_suffix := ""
-// 	if config.NodeType == "builder" {
-// 		node_suffix = "B"
-// 	} else if config.NodeType == "validator" {
-// 		node_suffix = "V"
-// 	} else {
-// 		node_suffix = "R"
-// 	}
-
-// 	routingTablePeerCountBefore := len(dht.RoutingTable().ListPeers())
-// 	dht.RoutingTable().TryAddPeer(remote_peer_id, false, false)
-// 	routingTablePeerCountAfter := len(dht.RoutingTable().ListPeers())
-
-// 	if routingTablePeerCountBefore == routingTablePeerCountAfter {
-// 		log.Printf("[%s - %s]: Failed to add peer %s to routing table\n", node_suffix, h.ID()[0:5].Pretty(), remote_peer_id[:5].Pretty())
-// 		return
-// 	}
-
-// 	log.Printf(
-// 		"[%s - %s]: Peer %s connected to builder (%d -> %d connections)\n",
-// 		node_suffix,
-// 		h.ID()[0:5].Pretty(),
-// 		remote_peer_id[:5].Pretty(),
-// 		routingTablePeerCountBefore,
-// 		routingTablePeerCountAfter,
-// 	)
-
-// 	return dht
-
-// }

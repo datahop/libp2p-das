@@ -372,7 +372,7 @@ func (s *Service) StartMessaging(h host.Host, dht *dht.IpfsDHT, stats *Stats, pe
 			hasFoundBlockStart := false
 			for !hasFoundBlockStart {
 
-				_, hops, getLatency, getTimestamp, err := dht.GetValueHops(
+				returnedPayload, hops, getLatency, getTimestamp, err := dht.GetValueHops(
 					ctx,
 					"/das/block/"+fmt.Sprint(blockID),
 				)
@@ -395,6 +395,7 @@ func (s *Service) StartMessaging(h host.Host, dht *dht.IpfsDHT, stats *Stats, pe
 					stats.BlockIDs = append(stats.BlockIDs, fmt.Sprint(blockID))
 					stats.ParcelKeyHashes = append(stats.ParcelKeyHashes, "-1")
 					stats.ParcelStatuses = append(stats.ParcelStatuses, "success")
+					stats.ParcelDataLengths = append(stats.ParcelDataLengths, len(returnedPayload))
 				}
 			}
 
@@ -467,7 +468,7 @@ func (s *Service) StartMessaging(h host.Host, dht *dht.IpfsDHT, stats *Stats, pe
 						ctx, cancel := context.WithTimeout(ctx, remainingTime)
 						defer cancel()
 
-						_, hops, getLatency, getTimestamp, err := dht.GetValueHops(
+						returnedPayload, hops, getLatency, getTimestamp, err := dht.GetValueHops(
 							ctx,
 							"/das/sample/"+fmt.Sprint(blockID)+"/"+parcelType+"/"+fmt.Sprint(p.StartingIndex),
 						)
@@ -489,6 +490,7 @@ func (s *Service) StartMessaging(h host.Host, dht *dht.IpfsDHT, stats *Stats, pe
 							stats.BlockIDs = append(stats.BlockIDs, fmt.Sprint(blockID))
 							stats.ParcelKeyHashes = append(stats.ParcelKeyHashes, keyHashString)
 							stats.ParcelStatuses = append(stats.ParcelStatuses, parcelStatus)
+							stats.ParcelDataLengths = append(stats.ParcelDataLengths, len(returnedPayload))
 
 							stats.TotalFailedGets += 1
 							stats.TotalGetMessages += 1
@@ -503,6 +505,7 @@ func (s *Service) StartMessaging(h host.Host, dht *dht.IpfsDHT, stats *Stats, pe
 							stats.BlockIDs = append(stats.BlockIDs, fmt.Sprint(blockID))
 							stats.ParcelKeyHashes = append(stats.ParcelKeyHashes, keyHashString)
 							stats.ParcelStatuses = append(stats.ParcelStatuses, "success")
+							stats.ParcelDataLengths = append(stats.ParcelDataLengths, len(returnedPayload))
 
 							stats.TotalGetMessages += 1
 							stats.TotalSuccessGets += 1
@@ -533,7 +536,7 @@ func (s *Service) StartMessaging(h host.Host, dht *dht.IpfsDHT, stats *Stats, pe
 			hasFoundBlockStart := false
 			for !hasFoundBlockStart {
 
-				_, hops, getLatency, getTimestamp, err := dht.GetValueHops(
+				returnedPayload, hops, getLatency, getTimestamp, err := dht.GetValueHops(
 					ctx,
 					"/das/block/"+fmt.Sprint(blockID),
 				)
@@ -556,6 +559,7 @@ func (s *Service) StartMessaging(h host.Host, dht *dht.IpfsDHT, stats *Stats, pe
 					// Record the starting signal as a parcel with id -1
 					stats.ParcelKeyHashes = append(stats.ParcelKeyHashes, "-1")
 					stats.ParcelStatuses = append(stats.ParcelStatuses, "success")
+					stats.ParcelDataLengths = append(stats.ParcelDataLengths, len(returnedPayload))
 				}
 			}
 
@@ -599,7 +603,7 @@ func (s *Service) StartMessaging(h host.Host, dht *dht.IpfsDHT, stats *Stats, pe
 						ctx, cancel := context.WithTimeout(ctx, remainingTime)
 						defer cancel()
 
-						_, hops, getLatency, getTimestamp, err := dht.GetValueHops(
+						returnedPayload, hops, getLatency, getTimestamp, err := dht.GetValueHops(
 							ctx,
 							"/das/sample/"+fmt.Sprint(blockID)+"/"+parcelType+"/"+fmt.Sprint(p.StartingIndex),
 						)
@@ -621,6 +625,7 @@ func (s *Service) StartMessaging(h host.Host, dht *dht.IpfsDHT, stats *Stats, pe
 							stats.BlockIDs = append(stats.BlockIDs, fmt.Sprint(blockID))
 							stats.ParcelKeyHashes = append(stats.ParcelKeyHashes, keyHashString)
 							stats.ParcelStatuses = append(stats.ParcelStatuses, parcelStatus)
+							stats.ParcelDataLengths = append(stats.ParcelDataLengths, len(returnedPayload))
 
 							stats.TotalFailedGets += 1
 							stats.TotalGetMessages += 1
@@ -636,6 +641,7 @@ func (s *Service) StartMessaging(h host.Host, dht *dht.IpfsDHT, stats *Stats, pe
 							stats.BlockIDs = append(stats.BlockIDs, fmt.Sprint(blockID))
 							stats.ParcelKeyHashes = append(stats.ParcelKeyHashes, keyHashString)
 							stats.ParcelStatuses = append(stats.ParcelStatuses, "success")
+							stats.ParcelDataLengths = append(stats.ParcelDataLengths, len(returnedPayload))
 
 							stats.TotalGetMessages += 1
 							stats.TotalSuccessGets += 1
