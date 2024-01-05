@@ -247,27 +247,6 @@ func (s *Service) StartMessaging(h host.Host, dht *dht.IpfsDHT, stats *Stats, pe
 					return
 				}
 
-				// Send block start signal
-				putErr := dht.PutValue(
-					ctx,
-					"/das/block/"+fmt.Sprint(blockID),
-					make([]byte, 1),
-				)
-				putTimestamp := time.Now()
-
-				if putErr != nil {
-					log.Printf("[B - %s] Failed to put block start signal: %s\n", s.host.ID()[0:5].Pretty(), putErr.Error())
-				} else {
-					log.Printf("[B - %s] Starting to seed block %d...\n", s.host.ID()[0:5].Pretty(), blockID)
-
-					// Record the starting signal as a parcel with id -1
-					stats.PutLatencies = append(stats.PutLatencies, time.Since(time.Now()))
-					stats.PutTimestamps = append(stats.PutTimestamps, putTimestamp)
-					stats.BlockIDs = append(stats.BlockIDs, fmt.Sprint(blockID))
-					stats.ParcelKeyHashes = append(stats.ParcelKeyHashes, "-1")
-					stats.ParcelStatuses = append(stats.ParcelStatuses, "success")
-				}
-
 				startTime := time.Now()
 
 				allParcels := SplitSamplesIntoParcels(ROW_COUNT, parcelSize, "all")
@@ -294,10 +273,10 @@ func (s *Service) StartMessaging(h host.Host, dht *dht.IpfsDHT, stats *Stats, pe
 						}
 
 						for !contains(seededParcelIDs, p.StartingIndex) {
-							remainingTime := time.Until(startTime.Add(BLOCK_TIME_SEC * time.Second))
+							//remainingTime := time.Until(startTime.Add(BLOCK_TIME_SEC * time.Second))
 
-							ctx, cancel := context.WithTimeout(ctx, remainingTime)
-							defer cancel()
+							//ctx, cancel := context.WithTimeout(ctx, remainingTime)
+							//defer cancel()
 
 							putStartTime := time.Now()
 							putErr := dht.PutValue(
@@ -358,7 +337,28 @@ func (s *Service) StartMessaging(h host.Host, dht *dht.IpfsDHT, stats *Stats, pe
 				stats.SeedingLatencies = append(stats.SeedingLatencies, elapsedTime)
 
 				log.Printf("[B - %s] Finished seeding block %d in %s (%d/%d)\n", s.host.ID()[0:5].Pretty(), blockID, elapsedTime, stats.TotalSuccessPuts, stats.TotalPutMessages)
+				// Send block start signal
+				putErr := dht.PutValue(
+					ctx,
+					"/das/block/"+fmt.Sprint(blockID),
+					make([]byte, 1),
+				)
+				putTimestamp := time.Now()
+
+				if putErr != nil {
+					log.Printf("[B - %s] Failed to put block start signal: %s\n", s.host.ID()[0:5].Pretty(), putErr.Error())
+				} else {
+					log.Printf("[B - %s] Starting to seed block %d...\n", s.host.ID()[0:5].Pretty(), blockID)
+
+					// Record the starting signal as a parcel with id -1
+					stats.PutLatencies = append(stats.PutLatencies, time.Since(time.Now()))
+					stats.PutTimestamps = append(stats.PutTimestamps, putTimestamp)
+					stats.BlockIDs = append(stats.BlockIDs, fmt.Sprint(blockID))
+					stats.ParcelKeyHashes = append(stats.ParcelKeyHashes, "-1")
+					stats.ParcelStatuses = append(stats.ParcelStatuses, "success")
+				}
 				blockID++
+
 			}
 		}()
 		wg.Wait()
@@ -371,29 +371,37 @@ func (s *Service) StartMessaging(h host.Host, dht *dht.IpfsDHT, stats *Stats, pe
 
 			hasFoundBlockStart := false
 			for !hasFoundBlockStart {
+                timeoutDuration := 1000 * time.Millisecond
+                ctxWithDeadline, cancel := context.WithTimeout(ctx, timeoutDuration)
+                defer cancel()
 
 				startTime := time.Now()
-				returnedPayload, hops, getLatency, getTimestamp, err := dht.GetValueHops(
-					ctx,
+				returnedPayload, err := dht.GetValue(
+					ctxWithDeadline,
 					"/das/block/"+fmt.Sprint(blockID),
 				)
-				getLatency = time.Since(startTime)
-				getTimestamp = time.Now()
+				getLatency := time.Since(startTime)
+				getTimestamp := time.Now()
 
-				if err != nil {
+
+                if ctxWithDeadline.Err() == context.DeadlineExceeded {
+		            fmt.Println("Operation timed out to get block %d start signal\n",blockID)
+
+				} else if err != nil {
 
 					if !strings.Contains(err.Error(), "routing: not found") {
 						log.Printf("[V - %s] Failed to get block %d start signal: %s\n", s.host.ID()[0:5].Pretty(), blockID, err.Error())
 					}
+                    log.Printf("Error fetching value: %v About to sleep...\n", err)
 
-					time.Sleep(time.Millisecond * 100)
+					time.Sleep(time.Millisecond * 1000)
 				} else {
 					hasFoundBlockStart = true
 					log.Printf("[V - %s] Found block %d start signal.\n", s.host.ID()[0:5].Pretty(), blockID)
 
 					// Record the starting signal as a parcel with hash "start"
 					stats.GetLatencies = append(stats.GetLatencies, getLatency)
-					stats.GetHops = append(stats.GetHops, hops)
+					stats.GetHops = append(stats.GetHops, 0)
 					stats.GetTimestamps = append(stats.GetTimestamps, getTimestamp)
 					stats.BlockIDs = append(stats.BlockIDs, fmt.Sprint(blockID))
 					stats.ParcelKeyHashes = append(stats.ParcelKeyHashes, "-1")
@@ -466,18 +474,18 @@ func (s *Service) StartMessaging(h host.Host, dht *dht.IpfsDHT, stats *Stats, pe
 					}
 
 					for !contains(sampledParcelIDs, p.StartingIndex) {
-						remainingTime := time.Until(startTime.Add(BLOCK_TIME_SEC * time.Second))
+						//remainingTime := time.Until(startTime.Add(BLOCK_TIME_SEC * time.Second))
 
-						ctx, cancel := context.WithTimeout(ctx, remainingTime)
-						defer cancel()
+						//ctx, cancel := context.WithTimeout(ctx, remainingTime)
+						//defer cancel()
 
 						startTime := time.Now()
-						returnedPayload, hops, getLatency, getTimestamp, err := dht.GetValueHops(
+						returnedPayload, err := dht.GetValue(
 							ctx,
 							"/das/sample/"+fmt.Sprint(blockID)+"/"+parcelType+"/"+fmt.Sprint(p.StartingIndex),
 						)
-						getLatency = time.Since(startTime)
-						getTimestamp = time.Now()
+						getLatency := time.Since(startTime)
+						getTimestamp := time.Now()
 
 						keyHash := sha256.Sum256([]byte("/das/sample/" + fmt.Sprint(blockID) + "/" + parcelType + "/" + fmt.Sprint(p.StartingIndex)))
 						keyHashString := fmt.Sprintf("%x", keyHash)
@@ -491,7 +499,7 @@ func (s *Service) StartMessaging(h host.Host, dht *dht.IpfsDHT, stats *Stats, pe
 							}
 
 							stats.GetLatencies = append(stats.GetLatencies, getLatency)
-							stats.GetHops = append(stats.GetHops, hops)
+							stats.GetHops = append(stats.GetHops, 0)
 							stats.GetTimestamps = append(stats.GetTimestamps, getTimestamp)
 							stats.BlockIDs = append(stats.BlockIDs, fmt.Sprint(blockID))
 							stats.ParcelKeyHashes = append(stats.ParcelKeyHashes, keyHashString)
@@ -506,7 +514,7 @@ func (s *Service) StartMessaging(h host.Host, dht *dht.IpfsDHT, stats *Stats, pe
 							}
 						} else {
 							stats.GetLatencies = append(stats.GetLatencies, getLatency)
-							stats.GetHops = append(stats.GetHops, hops)
+							stats.GetHops = append(stats.GetHops, 0)
 							stats.GetTimestamps = append(stats.GetTimestamps, getTimestamp)
 							stats.BlockIDs = append(stats.BlockIDs, fmt.Sprint(blockID))
 							stats.ParcelKeyHashes = append(stats.ParcelKeyHashes, keyHashString)
@@ -541,16 +549,22 @@ func (s *Service) StartMessaging(h host.Host, dht *dht.IpfsDHT, stats *Stats, pe
 
 			hasFoundBlockStart := false
 			for !hasFoundBlockStart {
+                timeoutDuration := 1000 * time.Millisecond
+                ctxWithDeadline, cancel := context.WithTimeout(ctx, timeoutDuration)
+                defer cancel()
 
 				startTime := time.Now()
-				returnedPayload, hops, getLatency, getTimestamp, err := dht.GetValueHops(
-					ctx,
+				returnedPayload, err := dht.GetValue(
+					ctxWithDeadline,
 					"/das/block/"+fmt.Sprint(blockID),
 				)
-				getLatency = time.Since(startTime)
-				getTimestamp = time.Now()
+				getLatency := time.Since(startTime)
+				getTimestamp := time.Now()
 
-				if err != nil {
+                if ctxWithDeadline.Err() == context.DeadlineExceeded {
+		            fmt.Println("Operation timed out to get block %d start signal\n",blockID)
+
+				} else if err != nil {
 
 					if !strings.Contains(err.Error(), "routing: not found") {
 						log.Printf("[V - %s] Failed to get block %d start signal: %s\n", s.host.ID()[0:5].Pretty(), blockID, err.Error())
@@ -562,7 +576,7 @@ func (s *Service) StartMessaging(h host.Host, dht *dht.IpfsDHT, stats *Stats, pe
 					log.Printf("[V - %s] Found block %d start signal.\n", s.host.ID()[0:5].Pretty(), blockID)
 
 					stats.GetLatencies = append(stats.GetLatencies, getLatency)
-					stats.GetHops = append(stats.GetHops, hops)
+					stats.GetHops = append(stats.GetHops, 0)
 					stats.GetTimestamps = append(stats.GetTimestamps, getTimestamp)
 					stats.BlockIDs = append(stats.BlockIDs, fmt.Sprint(blockID))
 					// Record the starting signal as a parcel with id -1
@@ -607,18 +621,18 @@ func (s *Service) StartMessaging(h host.Host, dht *dht.IpfsDHT, stats *Stats, pe
 					}
 
 					for !contains(sampledParcelIDs, p.StartingIndex) {
-						remainingTime := time.Until(startTime.Add(BLOCK_TIME_SEC * time.Second))
+						//remainingTime := time.Until(startTime.Add(BLOCK_TIME_SEC * time.Second))
 
-						ctx, cancel := context.WithTimeout(ctx, remainingTime)
-						defer cancel()
+						//ctx, cancel := context.WithTimeout(ctx, remainingTime)
+						//defer cancel()
 
 						startTime := time.Now()
-						returnedPayload, hops, getLatency, getTimestamp, err := dht.GetValueHops(
+						returnedPayload, err := dht.GetValue(
 							ctx,
 							"/das/sample/"+fmt.Sprint(blockID)+"/"+parcelType+"/"+fmt.Sprint(p.StartingIndex),
 						)
-						getLatency = time.Since(startTime)
-						getTimestamp = time.Now()
+						getLatency := time.Since(startTime)
+						getTimestamp := time.Now()
 
 						keyHash := sha256.Sum256([]byte("/das/sample/" + fmt.Sprint(blockID) + "/" + parcelType + "/" + fmt.Sprint(p.StartingIndex)))
 						keyHashString := fmt.Sprintf("%x", keyHash)
@@ -632,7 +646,7 @@ func (s *Service) StartMessaging(h host.Host, dht *dht.IpfsDHT, stats *Stats, pe
 							}
 
 							stats.GetLatencies = append(stats.GetLatencies, getLatency)
-							stats.GetHops = append(stats.GetHops, hops)
+							stats.GetHops = append(stats.GetHops, 0)
 							stats.GetTimestamps = append(stats.GetTimestamps, getTimestamp)
 							stats.BlockIDs = append(stats.BlockIDs, fmt.Sprint(blockID))
 							stats.ParcelKeyHashes = append(stats.ParcelKeyHashes, keyHashString)
@@ -648,7 +662,7 @@ func (s *Service) StartMessaging(h host.Host, dht *dht.IpfsDHT, stats *Stats, pe
 
 						} else {
 							stats.GetLatencies = append(stats.GetLatencies, getLatency)
-							stats.GetHops = append(stats.GetHops, hops)
+							stats.GetHops = append(stats.GetHops, 0)
 							stats.GetTimestamps = append(stats.GetTimestamps, getTimestamp)
 							stats.BlockIDs = append(stats.BlockIDs, fmt.Sprint(blockID))
 							stats.ParcelKeyHashes = append(stats.ParcelKeyHashes, keyHashString)

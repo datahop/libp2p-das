@@ -22,7 +22,7 @@ do
         top -l 600 -s 1 -o cpu -n 0 > "1b${i}v${i}r${j}p/stats.txt" &
         top_pid=$!
         
-        gtimeout 10m ./test.sh 1 ${i} ${i} ${j}
+        timeout 10m ./test.sh 1 ${i} ${i} ${j}
         if [ $? -eq 124 ]; then
             echo "Test timed out (10 mins). Skipping to next test."
             continue

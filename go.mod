@@ -1,6 +1,6 @@
 module github.com/libp2p-das
 
-go 1.21.5
+go 1.18
 
 require (
 	github.com/Blitz3r123/go-libp2p-kad-dht v1.0.0
