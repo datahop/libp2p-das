@@ -372,10 +372,13 @@ func (s *Service) StartMessaging(h host.Host, dht *dht.IpfsDHT, stats *Stats, pe
 			hasFoundBlockStart := false
 			for !hasFoundBlockStart {
 
+				startTime := time.Now()
 				returnedPayload, hops, getLatency, getTimestamp, err := dht.GetValueHops(
 					ctx,
 					"/das/block/"+fmt.Sprint(blockID),
 				)
+				getLatency = time.Since(startTime)
+				getTimestamp = time.Now()
 
 				if err != nil {
 
@@ -468,10 +471,13 @@ func (s *Service) StartMessaging(h host.Host, dht *dht.IpfsDHT, stats *Stats, pe
 						ctx, cancel := context.WithTimeout(ctx, remainingTime)
 						defer cancel()
 
+						startTime := time.Now()
 						returnedPayload, hops, getLatency, getTimestamp, err := dht.GetValueHops(
 							ctx,
 							"/das/sample/"+fmt.Sprint(blockID)+"/"+parcelType+"/"+fmt.Sprint(p.StartingIndex),
 						)
+						getLatency = time.Since(startTime)
+						getTimestamp = time.Now()
 
 						keyHash := sha256.Sum256([]byte("/das/sample/" + fmt.Sprint(blockID) + "/" + parcelType + "/" + fmt.Sprint(p.StartingIndex)))
 						keyHashString := fmt.Sprintf("%x", keyHash)
@@ -536,10 +542,13 @@ func (s *Service) StartMessaging(h host.Host, dht *dht.IpfsDHT, stats *Stats, pe
 			hasFoundBlockStart := false
 			for !hasFoundBlockStart {
 
+				startTime := time.Now()
 				returnedPayload, hops, getLatency, getTimestamp, err := dht.GetValueHops(
 					ctx,
 					"/das/block/"+fmt.Sprint(blockID),
 				)
+				getLatency = time.Since(startTime)
+				getTimestamp = time.Now()
 
 				if err != nil {
 
@@ -603,10 +612,13 @@ func (s *Service) StartMessaging(h host.Host, dht *dht.IpfsDHT, stats *Stats, pe
 						ctx, cancel := context.WithTimeout(ctx, remainingTime)
 						defer cancel()
 
+						startTime := time.Now()
 						returnedPayload, hops, getLatency, getTimestamp, err := dht.GetValueHops(
 							ctx,
 							"/das/sample/"+fmt.Sprint(blockID)+"/"+parcelType+"/"+fmt.Sprint(p.StartingIndex),
 						)
+						getLatency = time.Since(startTime)
+						getTimestamp = time.Now()
 
 						keyHash := sha256.Sum256([]byte("/das/sample/" + fmt.Sprint(blockID) + "/" + parcelType + "/" + fmt.Sprint(p.StartingIndex)))
 						keyHashString := fmt.Sprintf("%x", keyHash)
