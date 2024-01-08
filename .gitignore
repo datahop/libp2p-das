@@ -1,2 +1,4 @@
 .DS_Store
 *.csv
+data_analysis/data/*
+.vscode/*

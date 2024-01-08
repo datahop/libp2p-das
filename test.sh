@@ -1,28 +1,61 @@
 #!/bin/bash
 
-if [ $# -ge 1 ]; then
-    # Check if the second parameter is 'debug'
-    if [ $# -eq 2 ] && [ $2 == "debug" ]; then
-        echo "Starting libp2p-das with $1 peers in debug mode."
-    else
-        echo "Starting libp2p-das with $1 peers."
-    fi
-else
-    echo "Please enter at least 1 parameter. The first parameter is a number and the second parameter is optional and can be 'debug'."
+rm -rf ./*_builder.csv
+rm -rf ./*_validator.csv
+rm -rf ./*_nonvalidator.csv
+rm -rf ./startingIndexes*.csv
+rm -rf ./randomParcel*.csv
+
+if [ -z "$1" ] || [ -z "$2" ] || [ -z "$3" ] || [ -z "$4" ]; then
+    echo "There should be 4 parameters: builderCount, validatorCount, nonValidatorCount, and parcelSize. e.g. test.sh 1 2 1 512"
+    exit 1
 fi
 
-go run . -debug -seed 1234 -port 61960 -duration 15 &
-sleep 2
+builderCount=$1
+validatorCount=$2
+nonValidatorCount=$3
+parcelSize=$4
 
-for ((i=1;i<=$1-1;i++));
-do
-    if [ $# -eq 2 ] && [ $2 == "debug" ]; then
-        go run . -debug -peer /ip4/127.0.0.1/tcp/61960/p2p/12D3KooWE3AwZFT9zEWDUxhya62hmvEbRxYBWaosn7Kiqw5wsu73 -duration 15&
-        sleep 1
-    else 
-        go run . -peer /ip4/127.0.0.1/tcp/61960/p2p/12D3KooWE3AwZFT9zEWDUxhya62hmvEbRxYBWaosn7Kiqw5wsu73 -duration 15 &
-        sleep 1
-    fi
+if [ $builderCount -le 0 ]; then
+    echo "builderCount should be greater than 0."
+    exit 1
+fi
+
+nonBuilderCount=$((validatorCount + nonValidatorCount))
+
+if [ $nonBuilderCount -le 0 ]; then
+    echo "The sum of validatorCount and nonValidatorCount should be greater than 0."
+    exit 1
+fi
+
+# echo "Starting $builderCount builder(s), $validatorCount validator(s), and $nonValidatorCount non-validator(s) with parcel size $parcelSize..."
+
+# Create an array to store background process IDs
+declare -a bg_pids
+
+trap 'echo "Stopping all processes"; pkill -P $$; exit 1' SIGINT
+
+for ((i=1; i<=$builderCount; i++)); do
+    ./run_node.sh builder $parcelSize &
+    bg_pids+=($!)  # Store the background process ID in the array
+done
+# echo "Buiders started."
+
+for ((i=1; i<=$validatorCount; i++)); do
+    ./run_node.sh validator $parcelSize &
+    bg_pids+=($!)
+done
+# echo "Validators started."
+
+for ((i=1; i<=$nonValidatorCount; i++)); do
+    ./run_node.sh nonvalidator $parcelSize &
+    bg_pids+=($!)
+done
+# echo "Non-validators started."
+
+# Wait for all background processes to finish
+for pid in "${bg_pids[@]}"; do
+    wait $pid
 done
 
-wait $!
+echo "All processes have finished."

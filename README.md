@@ -1,32 +1,15 @@
-# How to run
-## Normal
+# Local Testing
+
 ```shell
-./run.sh <is_bootstrap> <execution_duration_in_secs>
+./test.sh <builder_count> <validator_count> <regular_count> <parcel_size>
 ```
 
 Example:
-Running 3 peers with 1 being the bootstrap node for 20 seconds.
 ```shell
-./run.sh bootstrap 20
-./run.sh 20
-./run.sh 20
+./test.sh 1 1 1 512
 ```
 
-## Testing
+## Grid5k Usage
 ```shell
-./test.sh <node_count> <debug_mode>
+./run.sh <experiment_name> <builder_count> <validator_count> <regular_count> <login> <builder_ip> <parcel_size>
 ```
-
-Example: 
-Running 3 peers.
-```shell
-./test.sh 3
-```
-
-# Logging
-What do I log?
-- # of put message
-- # of get messages
-    - # of successful gets
-    - # of failed gets
-- latencies per message
