@@ -11,19 +11,19 @@ import (
 	"sync"
 	"time"
 
-	dht "github.com/Blitz3r123/go-libp2p-kad-dht"
-	"github.com/libp2p/go-libp2p-core/host"
-	"github.com/libp2p/go-libp2p-core/peer"
-	"github.com/libp2p/go-libp2p-core/protocol"
-	rpc "github.com/libp2p/go-libp2p-gorpc"
+	dht "github.com/libp2p/go-libp2p-kad-dht"
+	"github.com/libp2p/go-libp2p/core/host"
+	"github.com/libp2p/go-libp2p/core/peer"
+	"github.com/libp2p/go-libp2p/core/protocol"
+	//rpc "github.com/libp2p/go-libp2p-gorpc"
 	// dht "./vendor/go-libp2p-kad-dht"
 )
 
 type Service struct {
-	rpcServer *rpc.Server
-	rpcClient *rpc.Client
-	host      host.Host
-	protocol  protocol.ID
+	//rpcServer *rpc.Server
+	//rpcClient *rpc.Client
+	host     host.Host
+	protocol protocol.ID
 }
 
 type Parcel struct {
@@ -48,7 +48,7 @@ func NewService(host host.Host, protocol protocol.ID) *Service {
 	}
 }
 
-func (s *Service) SetupRPC() error {
+/*func (s *Service) SetupRPC() error {
 	echoRPCAPI := EchoRPCAPI{service: s}
 
 	s.rpcServer = rpc.NewServer(s.host, s.protocol)
@@ -59,7 +59,7 @@ func (s *Service) SetupRPC() error {
 
 	s.rpcClient = rpc.NewClientWithServer(s.host, s.protocol, s.rpcServer)
 	return nil
-}
+}*/
 
 func SplitSamplesIntoParcels(RowCount, parcelSize int, parcelType string) []Parcel {
 	TotalSamplesCount := RowCount * RowCount
@@ -371,9 +371,9 @@ func (s *Service) StartMessaging(h host.Host, dht *dht.IpfsDHT, stats *Stats, pe
 
 			hasFoundBlockStart := false
 			for !hasFoundBlockStart {
-                timeoutDuration := 1000 * time.Millisecond
-                ctxWithDeadline, cancel := context.WithTimeout(ctx, timeoutDuration)
-                defer cancel()
+				timeoutDuration := 1000 * time.Millisecond
+				ctxWithDeadline, cancel := context.WithTimeout(ctx, timeoutDuration)
+				defer cancel()
 
 				startTime := time.Now()
 				returnedPayload, err := dht.GetValue(
@@ -383,16 +383,15 @@ func (s *Service) StartMessaging(h host.Host, dht *dht.IpfsDHT, stats *Stats, pe
 				getLatency := time.Since(startTime)
 				getTimestamp := time.Now()
 
-
-                if ctxWithDeadline.Err() == context.DeadlineExceeded {
-		            fmt.Println("Operation timed out to get block %d start signal\n",blockID)
+				if ctxWithDeadline.Err() == context.DeadlineExceeded {
+					fmt.Println("Operation timed out to get block %d start signal\n", blockID)
 
 				} else if err != nil {
 
 					if !strings.Contains(err.Error(), "routing: not found") {
 						log.Printf("[V - %s] Failed to get block %d start signal: %s\n", s.host.ID()[0:5].Pretty(), blockID, err.Error())
 					}
-                    log.Printf("Error fetching value: %v About to sleep...\n", err)
+					log.Printf("Error fetching value: %v About to sleep...\n", err)
 
 					time.Sleep(time.Millisecond * 1000)
 				} else {
@@ -549,9 +548,9 @@ func (s *Service) StartMessaging(h host.Host, dht *dht.IpfsDHT, stats *Stats, pe
 
 			hasFoundBlockStart := false
 			for !hasFoundBlockStart {
-                timeoutDuration := 1000 * time.Millisecond
-                ctxWithDeadline, cancel := context.WithTimeout(ctx, timeoutDuration)
-                defer cancel()
+				timeoutDuration := 1000 * time.Millisecond
+				ctxWithDeadline, cancel := context.WithTimeout(ctx, timeoutDuration)
+				defer cancel()
 
 				startTime := time.Now()
 				returnedPayload, err := dht.GetValue(
@@ -561,8 +560,8 @@ func (s *Service) StartMessaging(h host.Host, dht *dht.IpfsDHT, stats *Stats, pe
 				getLatency := time.Since(startTime)
 				getTimestamp := time.Now()
 
-                if ctxWithDeadline.Err() == context.DeadlineExceeded {
-		            fmt.Println("Operation timed out to get block %d start signal\n",blockID)
+				if ctxWithDeadline.Err() == context.DeadlineExceeded {
+					fmt.Println("Operation timed out to get block %d start signal\n", blockID)
 
 				} else if err != nil {
 

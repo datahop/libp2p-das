@@ -15,15 +15,12 @@ import (
 	"sync"
 	"time"
 
-	dht "github.com/Blitz3r123/go-libp2p-kad-dht"
 	"github.com/libp2p/go-libp2p"
-	"github.com/libp2p/go-libp2p-core/crypto"
-	"github.com/libp2p/go-libp2p-core/host"
-	"github.com/libp2p/go-libp2p-core/network"
-	"github.com/libp2p/go-libp2p-core/peer"
-	"github.com/libp2p/go-libp2p-core/protocol"
-	discovery "github.com/libp2p/go-libp2p-discovery"
-	peerstore "github.com/libp2p/go-libp2p-peerstore"
+	dht "github.com/libp2p/go-libp2p-kad-dht"
+	"github.com/libp2p/go-libp2p/core/crypto"
+	"github.com/libp2p/go-libp2p/core/host"
+	"github.com/libp2p/go-libp2p/core/peer"
+	"github.com/libp2p/go-libp2p/core/protocol"
 	"github.com/multiformats/go-multiaddr"
 )
 
@@ -120,7 +117,7 @@ func main() {
 	addr, _ := multiaddr.NewMultiaddr(fmt.Sprintf("/ip4/127.0.0.1/tcp/%d", config.Port))
 
 	h, err := libp2p.New(
-		context.Background(),
+		//context.Background(),
 		libp2p.ListenAddrs(addr),
 		libp2p.Identity(priv),
 	)
@@ -133,12 +130,12 @@ func main() {
 		log.Fatal(err)
 	}
 
-	h.Peerstore().AddAddrs(dht.Host().ID(), dht.Host().Addrs(), peerstore.PermanentAddrTTL)
-	routingDiscovery := discovery.NewRoutingDiscovery(dht)
-	discovery.Advertise(context.Background(), routingDiscovery, "das")
+	//h.Peerstore().AddAddrs(dht.Host().ID(), dht.Host().Addrs(), peerstore.PermanentAddrTTL)
+	//routingDiscovery := discovery.NewRoutingDiscovery(dht)
+	//discovery.Advertise(context.Background(), routingDiscovery, "das")
 
 	// Register an event handler for peer connection
-	h.Network().Notify(&network.NotifyBundle{
+	/*h.Network().Notify(&network.NotifyBundle{
 		ConnectedF: func(n network.Network, c network.Conn) {
 
 			if c.LocalPeer().String() == builder_id {
@@ -172,7 +169,7 @@ func main() {
 
 			}
 		},
-	})
+	})*/
 
 	var wg sync.WaitGroup
 	ctx, cancel := context.WithCancel(context.Background())
@@ -192,10 +189,10 @@ func main() {
 	}
 
 	service := NewService(h, protocol.ID(config.ProtocolID))
-	err = service.SetupRPC()
+	/*err = service.SetupRPC()
 	if err != nil {
 		log.Fatal(err)
-	}
+	}*/
 
 	service.StartMessaging(h, dht, stats, nodeType, config.ParcelSize, ctx)
 

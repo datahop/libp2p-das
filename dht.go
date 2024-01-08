@@ -4,8 +4,8 @@ import (
 	"context"
 	"log"
 
-	dht "github.com/Blitz3r123/go-libp2p-kad-dht"
-	"github.com/libp2p/go-libp2p-core/host"
+	dht "github.com/libp2p/go-libp2p-kad-dht"
+	"github.com/libp2p/go-libp2p/core/host"
 )
 
 type blankValidator struct{}
