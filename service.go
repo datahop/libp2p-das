@@ -2,19 +2,16 @@ package main
 
 import (
 	"context"
-	"crypto/sha256"
 	"fmt"
 	"log"
 	"math/rand"
 	"sort"
-	"strings"
-	"sync"
 	"time"
 
-	dht "github.com/Blitz3r123/go-libp2p-kad-dht"
-	"github.com/libp2p/go-libp2p-core/host"
-	"github.com/libp2p/go-libp2p-core/peer"
-	"github.com/libp2p/go-libp2p-core/protocol"
+	dht "github.com/libp2p/go-libp2p-kad-dht"
+   "github.com/libp2p/go-libp2p/core/host"
+   "github.com/libp2p/go-libp2p/core/peer"
+   "github.com/libp2p/go-libp2p/core/protocol"
 	rpc "github.com/libp2p/go-libp2p-gorpc"
 	// dht "./vendor/go-libp2p-kad-dht"
 )
@@ -201,7 +198,7 @@ func CopyEnvelopesToIfaces(in []*Envelope) []interface{} {
 	return ifaces
 }
 
-func (s *Service) StartMessaging(h host.Host, dht *dht.IpfsDHT, stats *Stats, peerType string, parcelSize int, ctx context.Context) {
+func (s *Service) StartMessaging(h host.Host, dht *dht.IpfsDHT, stats *Stats, peerType string, parcelSize int, ctx context.Context, exp_duration int) {
 
 	if h == nil {
 		panic("Host is nil")
@@ -226,469 +223,75 @@ func (s *Service) StartMessaging(h host.Host, dht *dht.IpfsDHT, stats *Stats, pe
 		return
 	}
 
-	if peerType == "builder" {
+   expeDurationTicker := time.NewTicker(time.Duration(exp_duration) * time.Second)
+   defer expeDurationTicker.Stop()
+   blockID := 0
+
+   pub, err := CreatePubSub(h, ctx)
+   if err != nil {
+      log.Println("Error creating pubSub:", err)
+      return
+   }
+
+   if peerType == "builder" {
 
 		for len(dht.RoutingTable().ListPeers()) == 0 {
-			log.Printf("[B - %s] Waiting for peers to join...\n", s.host.ID()[0:5].Pretty())
+			log.Printf("[B - %s] Waiting for peers to join...\n", s.host.ID()[0:5])
 			time.Sleep(time.Second)
 		}
 
-		ticker := time.NewTicker(BLOCK_TIME_SEC * time.Second)
+      // TODO add exp_duration as a parameter
+		blockTicker := time.NewTicker(BLOCK_TIME_SEC * time.Second)
+      defer blockTicker.Stop()
+      for {
+         select {
+         case <-expeDurationTicker.C:
+            log.Println("Experiment time exceeded")
+            //finished <- true
+            return
 
-		var wg sync.WaitGroup
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			blockID := 0
-			for range ticker.C {
-				// Add an extra block to give everyone a chance to sample the last block
-				if blockID >= TOTAL_BLOCK_COUNT+1 {
-					ticker.Stop()
-					return
-				}
-
-				startTime := time.Now()
-
-				allParcels := SplitSamplesIntoParcels(ROW_COUNT, parcelSize, "all")
-
-				// Randomize allParcels
-				rand.Shuffle(len(allParcels), func(i, j int) {
-					allParcels[i], allParcels[j] = allParcels[j], allParcels[i]
-				})
-
-				log.Printf("[B - %s] Seeding %d parcels for block %d...\n", s.host.ID()[0:5].Pretty(), len(allParcels), blockID)
-
-				seededParcelIDs := make([]int, 0)
-				var parcelWg sync.WaitGroup
-				for _, parcel := range allParcels {
-					parcelWg.Add(1)
-					go func(p Parcel) {
-						defer parcelWg.Done()
-
-						parcelSamplesToSend := make([]byte, p.SampleCount*512)
-
-						parcelType := "row"
-						if !p.IsRow {
-							parcelType = "col"
-						}
-
-						for !contains(seededParcelIDs, p.StartingIndex) {
-							//remainingTime := time.Until(startTime.Add(BLOCK_TIME_SEC * time.Second))
-
-							//ctx, cancel := context.WithTimeout(ctx, remainingTime)
-							//defer cancel()
-
-							putStartTime := time.Now()
-							putErr := dht.PutValue(
-								ctx,
-								"/das/sample/"+fmt.Sprint(blockID)+"/"+parcelType+"/"+fmt.Sprint(p.StartingIndex),
-								parcelSamplesToSend,
-							)
-							putLatency := time.Since(putStartTime)
-							putTimestamp := time.Now()
-
-							keyHash := sha256.Sum256([]byte("/das/sample/" + fmt.Sprint(blockID) + "/" + parcelType + "/" + fmt.Sprint(p.StartingIndex)))
-							keyHashString := fmt.Sprintf("%x", keyHash)
-
-							if putErr != nil {
-								parcelStatus := "fail"
-								if putErr.Error() == "context deadline exceeded" {
-									parcelStatus = "timeout"
-								}
-
-								stats.PutLatencies = append(stats.PutLatencies, putLatency)
-								stats.PutTimestamps = append(stats.PutTimestamps, putTimestamp)
-								stats.BlockIDs = append(stats.BlockIDs, fmt.Sprint(blockID))
-								stats.ParcelKeyHashes = append(stats.ParcelKeyHashes, keyHashString)
-								stats.ParcelStatuses = append(stats.ParcelStatuses, parcelStatus)
-
-								stats.TotalFailedPuts += 1
-								stats.TotalPutMessages += 1
-
-								if putErr.Error() == "context deadline exceeded" {
-									break
-								} else if putErr.Error() == "failed to find any peer in table" {
-									break
-								} else {
-									log.Printf("[B - %s] Failed to put parcel %d: %s\n", s.host.ID()[0:5].Pretty(), p.StartingIndex, putErr.Error())
-								}
-							} else {
-
-								// log.Printf("[B - %s] Successfully put parcel %d\n", s.host.ID()[0:5].Pretty(), p.StartingIndex)
-
-								stats.PutLatencies = append(stats.PutLatencies, time.Since(putStartTime))
-								stats.PutTimestamps = append(stats.PutTimestamps, putTimestamp)
-								stats.BlockIDs = append(stats.BlockIDs, fmt.Sprint(blockID))
-								stats.ParcelKeyHashes = append(stats.ParcelKeyHashes, keyHashString)
-								stats.ParcelStatuses = append(stats.ParcelStatuses, "success")
-
-								stats.TotalSuccessPuts += 1
-								stats.TotalPutMessages += 1
-
-								seededParcelIDs = append(seededParcelIDs, p.StartingIndex)
-							}
-						}
-					}(parcel)
-				}
-
-				parcelWg.Wait()
-
-				elapsedTime := time.Since(startTime)
-				stats.SeedingLatencies = append(stats.SeedingLatencies, elapsedTime)
-
-				log.Printf("[B - %s] Finished seeding block %d in %s (%d/%d)\n", s.host.ID()[0:5].Pretty(), blockID, elapsedTime, stats.TotalSuccessPuts, stats.TotalPutMessages)
-				// Send block start signal
-				putErr := dht.PutValue(
-					ctx,
-					"/das/block/"+fmt.Sprint(blockID),
-					make([]byte, 1),
-				)
-				putTimestamp := time.Now()
-
-				if putErr != nil {
-					log.Printf("[B - %s] Failed to put block start signal: %s\n", s.host.ID()[0:5].Pretty(), putErr.Error())
-				} else {
-					log.Printf("[B - %s] Starting to seed block %d...\n", s.host.ID()[0:5].Pretty(), blockID)
-
-					// Record the starting signal as a parcel with id -1
-					stats.PutLatencies = append(stats.PutLatencies, time.Since(time.Now()))
-					stats.PutTimestamps = append(stats.PutTimestamps, putTimestamp)
-					stats.BlockIDs = append(stats.BlockIDs, fmt.Sprint(blockID))
-					stats.ParcelKeyHashes = append(stats.ParcelKeyHashes, "-1")
-					stats.ParcelStatuses = append(stats.ParcelStatuses, "success")
-				}
-				blockID++
-
-			}
-		}()
-		wg.Wait()
-
-		log.Printf("[B - %s] Finished seeding %d blocks.\n", s.host.ID()[0:5].Pretty(), TOTAL_BLOCK_COUNT)
+         case <-blockTicker.C:
+            pub.HeaderPublish(blockID)
+            blockID += 1
+            go StartSeedingBlock(blockID, ROW_COUNT, parcelSize, s, ctx, stats, dht)
+            //TODO add a mutex to make currBlock thread-safe
+         default:
+         }
+      }
 
 	} else if peerType == "validator" {
+      go pub.readLoop()
+      for {
+         select {
+         case <-expeDurationTicker.C:
+            log.Println("Experiment time exceded")
+            //finished <- true
+            return
+         case m := <-pub.messages:
+            //log.Printf("Got a message %s", msg)
+            blockID = m.BlockID
+            go StartValidatorSampling(blockID, ROW_COUNT, parcelSize, s, ctx, stats, dht)
 
-		for blockID := 0; blockID <= TOTAL_BLOCK_COUNT; blockID++ {
-
-			hasFoundBlockStart := false
-			for !hasFoundBlockStart {
-                timeoutDuration := 1000 * time.Millisecond
-                ctxWithDeadline, cancel := context.WithTimeout(ctx, timeoutDuration)
-                defer cancel()
-
-				startTime := time.Now()
-				returnedPayload, err := dht.GetValue(
-					ctxWithDeadline,
-					"/das/block/"+fmt.Sprint(blockID),
-				)
-				getLatency := time.Since(startTime)
-				getTimestamp := time.Now()
-
-
-                if ctxWithDeadline.Err() == context.DeadlineExceeded {
-		            fmt.Println("Operation timed out to get block %d start signal\n",blockID)
-
-				} else if err != nil {
-
-					if !strings.Contains(err.Error(), "routing: not found") {
-						log.Printf("[V - %s] Failed to get block %d start signal: %s\n", s.host.ID()[0:5].Pretty(), blockID, err.Error())
-					}
-                    log.Printf("Error fetching value: %v About to sleep...\n", err)
-
-					time.Sleep(time.Millisecond * 1000)
-				} else {
-					hasFoundBlockStart = true
-					log.Printf("[V - %s] Found block %d start signal.\n", s.host.ID()[0:5].Pretty(), blockID)
-
-					// Record the starting signal as a parcel with hash "start"
-					stats.GetLatencies = append(stats.GetLatencies, getLatency)
-					stats.GetHops = append(stats.GetHops, 0)
-					stats.GetTimestamps = append(stats.GetTimestamps, getTimestamp)
-					stats.BlockIDs = append(stats.BlockIDs, fmt.Sprint(blockID))
-					stats.ParcelKeyHashes = append(stats.ParcelKeyHashes, "-1")
-					stats.ParcelStatuses = append(stats.ParcelStatuses, "success")
-					stats.ParcelDataLengths = append(stats.ParcelDataLengths, len(returnedPayload))
-				}
-			}
-
-			startTime := time.Now()
-
-			samplesPerRow := ROW_COUNT / 2
-			rowColParcelsNeededCount := samplesPerRow / parcelSize
-
-			if samplesPerRow%parcelSize != 0 {
-				rowColParcelsNeededCount++
-			}
-
-			randomParcelsNeededCount := 75
-
-			// log.Printf("[V - %s] ROW_COUNT: %d, parcelSize: %d, \n\t\t(ROW_COUNT / 2) / parcelSize \n\t\t = (%d / 2) / %d \n\t\t = %d / %d\n\t\t = %d\n",
-			// 	s.host.ID()[0:5].Pretty(),
-			// 	ROW_COUNT,
-			// 	parcelSize,
-			// 	ROW_COUNT,
-			// 	parcelSize,
-			// 	samplesPerRow,
-			// 	parcelSize,
-			// 	rowColParcelsNeededCount,
-			// )
-
-			allParcels := SplitSamplesIntoParcels(ROW_COUNT, parcelSize, "all")
-			rowParcels := SplitSamplesIntoParcels(ROW_COUNT, parcelSize, "row")
-			colParcels := SplitSamplesIntoParcels(ROW_COUNT, parcelSize, "col")
-
-			randomRowParcels := pickRandomParcels(rowParcels, rowColParcelsNeededCount)
-			randomColParcels := pickRandomParcels(colParcels, rowColParcelsNeededCount)
-			randomParcels := pickRandomParcels(allParcels, randomParcelsNeededCount)
-
-			allRandomParcels := append(randomRowParcels, randomColParcels...)
-			allRandomParcels = append(allRandomParcels, randomParcels...)
-
-			// Randomize allRandomParcels
-			rand.Shuffle(len(allRandomParcels), func(i, j int) {
-				allRandomParcels[i], allRandomParcels[j] = allRandomParcels[j], allRandomParcels[i]
-			})
-
-			log.Printf(
-				"[V - %s] Sampling %d parcels (%d/%d Rows, %d/%d Cols, %d/%d All) for Block %d...\n",
-				s.host.ID()[0:5].Pretty(),
-				len(allRandomParcels),
-				len(randomRowParcels),
-				rowColParcelsNeededCount,
-				len(randomColParcels),
-				rowColParcelsNeededCount,
-				len(randomParcels),
-				randomParcelsNeededCount,
-				blockID,
-			)
-
-			sampledParcelIDs := make([]int, 0)
-			var parcelWg sync.WaitGroup
-			for _, parcel := range allRandomParcels {
-				parcelWg.Add(1)
-				go func(p Parcel) {
-					defer parcelWg.Done()
-
-					parcelType := "col"
-					if p.IsRow {
-						parcelType = "row"
-					}
-
-					for !contains(sampledParcelIDs, p.StartingIndex) {
-						//remainingTime := time.Until(startTime.Add(BLOCK_TIME_SEC * time.Second))
-
-						//ctx, cancel := context.WithTimeout(ctx, remainingTime)
-						//defer cancel()
-
-						startTime := time.Now()
-						returnedPayload, err := dht.GetValue(
-							ctx,
-							"/das/sample/"+fmt.Sprint(blockID)+"/"+parcelType+"/"+fmt.Sprint(p.StartingIndex),
-						)
-						getLatency := time.Since(startTime)
-						getTimestamp := time.Now()
-
-						keyHash := sha256.Sum256([]byte("/das/sample/" + fmt.Sprint(blockID) + "/" + parcelType + "/" + fmt.Sprint(p.StartingIndex)))
-						keyHashString := fmt.Sprintf("%x", keyHash)
-
-						if err != nil {
-							// log.Printf("[V - %s] Failed to get parcel %d: %s\n", s.host.ID()[0:5].Pretty(), p.StartingIndex, err.Error())
-
-							parcelStatus := "fail"
-							if err.Error() == "context deadline exceeded" {
-								parcelStatus = "timeout"
-							}
-
-							stats.GetLatencies = append(stats.GetLatencies, getLatency)
-							stats.GetHops = append(stats.GetHops, 0)
-							stats.GetTimestamps = append(stats.GetTimestamps, getTimestamp)
-							stats.BlockIDs = append(stats.BlockIDs, fmt.Sprint(blockID))
-							stats.ParcelKeyHashes = append(stats.ParcelKeyHashes, keyHashString)
-							stats.ParcelStatuses = append(stats.ParcelStatuses, parcelStatus)
-							stats.ParcelDataLengths = append(stats.ParcelDataLengths, len(returnedPayload))
-
-							stats.TotalFailedGets += 1
-							stats.TotalGetMessages += 1
-
-							if err.Error() == "context deadline exceeded" {
-								break
-							}
-						} else {
-							stats.GetLatencies = append(stats.GetLatencies, getLatency)
-							stats.GetHops = append(stats.GetHops, 0)
-							stats.GetTimestamps = append(stats.GetTimestamps, getTimestamp)
-							stats.BlockIDs = append(stats.BlockIDs, fmt.Sprint(blockID))
-							stats.ParcelKeyHashes = append(stats.ParcelKeyHashes, keyHashString)
-							stats.ParcelStatuses = append(stats.ParcelStatuses, "success")
-							stats.ParcelDataLengths = append(stats.ParcelDataLengths, len(returnedPayload))
-
-							stats.TotalGetMessages += 1
-							stats.TotalSuccessGets += 1
-
-							sampledParcelIDs = append(sampledParcelIDs, p.StartingIndex)
-
-						}
-					}
-
-				}(parcel)
-			}
-			parcelWg.Wait()
-
-			stats.TotalSamplingLatencies = append(stats.TotalSamplingLatencies, time.Since(startTime))
-
-			log.Printf("[V - %s] Block %d sampling took %.2f seconds.\n", s.host.ID()[0:5].Pretty(), blockID, time.Since(startTime).Seconds())
-
-			// Wait until the block time is over
-			remainingTime := time.Until(startTime.Add(BLOCK_TIME_SEC * time.Second))
-			time.Sleep(remainingTime)
-
-		}
+         default:
+         }
+      }
 
 	} else if peerType == "nonvalidator" {
+      go pub.readLoop()
+      for {
+         select {
+         case <-expeDurationTicker.C:
+            log.Println("Experiment time exceded")
+            //finished <- true
+            return
+         case m := <-pub.messages:
+            //log.Printf("Got a message %s", msg)
+            blockID = m.BlockID
+            go StartRegularSampling(blockID, ROW_COUNT, parcelSize, s, ctx, stats, dht)
+         default:
+         }
+      }
 
-		for blockID := 0; blockID <= TOTAL_BLOCK_COUNT; blockID++ {
-
-			hasFoundBlockStart := false
-			for !hasFoundBlockStart {
-                timeoutDuration := 1000 * time.Millisecond
-                ctxWithDeadline, cancel := context.WithTimeout(ctx, timeoutDuration)
-                defer cancel()
-
-				startTime := time.Now()
-				returnedPayload, err := dht.GetValue(
-					ctxWithDeadline,
-					"/das/block/"+fmt.Sprint(blockID),
-				)
-				getLatency := time.Since(startTime)
-				getTimestamp := time.Now()
-
-                if ctxWithDeadline.Err() == context.DeadlineExceeded {
-		            fmt.Println("Operation timed out to get block %d start signal\n",blockID)
-
-				} else if err != nil {
-
-					if !strings.Contains(err.Error(), "routing: not found") {
-						log.Printf("[V - %s] Failed to get block %d start signal: %s\n", s.host.ID()[0:5].Pretty(), blockID, err.Error())
-					}
-
-					time.Sleep(time.Millisecond * 100)
-				} else {
-					hasFoundBlockStart = true
-					log.Printf("[V - %s] Found block %d start signal.\n", s.host.ID()[0:5].Pretty(), blockID)
-
-					stats.GetLatencies = append(stats.GetLatencies, getLatency)
-					stats.GetHops = append(stats.GetHops, 0)
-					stats.GetTimestamps = append(stats.GetTimestamps, getTimestamp)
-					stats.BlockIDs = append(stats.BlockIDs, fmt.Sprint(blockID))
-					// Record the starting signal as a parcel with id -1
-					stats.ParcelKeyHashes = append(stats.ParcelKeyHashes, "-1")
-					stats.ParcelStatuses = append(stats.ParcelStatuses, "success")
-					stats.ParcelDataLengths = append(stats.ParcelDataLengths, len(returnedPayload))
-				}
-			}
-
-			startTime := time.Now()
-
-			log.Printf("[R - %s] Starting to sample block %d...\n", s.host.ID()[0:5].Pretty(), blockID)
-
-			randomParcelsNeededCount := 75
-
-			allParcels := SplitSamplesIntoParcels(ROW_COUNT, parcelSize, "all")
-
-			randomParcels := pickRandomParcels(allParcels, randomParcelsNeededCount)
-
-			// Randomize allRandomParcels
-			rand.Shuffle(len(randomParcels), func(i, j int) {
-				randomParcels[i], randomParcels[j] = randomParcels[j], randomParcels[i]
-			})
-
-			log.Printf(
-				"[R - %s] Sampling %d random parcels for Block %d...\n",
-				s.host.ID()[0:5].Pretty(),
-				len(randomParcels),
-				blockID,
-			)
-
-			sampledParcelIDs := make([]int, 0)
-			var parcelWg sync.WaitGroup
-			for _, parcel := range randomParcels {
-				parcelWg.Add(1)
-				go func(p Parcel, blockID int) {
-					defer parcelWg.Done()
-
-					parcelType := "col"
-					if p.IsRow {
-						parcelType = "row"
-					}
-
-					for !contains(sampledParcelIDs, p.StartingIndex) {
-						//remainingTime := time.Until(startTime.Add(BLOCK_TIME_SEC * time.Second))
-
-						//ctx, cancel := context.WithTimeout(ctx, remainingTime)
-						//defer cancel()
-
-						startTime := time.Now()
-						returnedPayload, err := dht.GetValue(
-							ctx,
-							"/das/sample/"+fmt.Sprint(blockID)+"/"+parcelType+"/"+fmt.Sprint(p.StartingIndex),
-						)
-						getLatency := time.Since(startTime)
-						getTimestamp := time.Now()
-
-						keyHash := sha256.Sum256([]byte("/das/sample/" + fmt.Sprint(blockID) + "/" + parcelType + "/" + fmt.Sprint(p.StartingIndex)))
-						keyHashString := fmt.Sprintf("%x", keyHash)
-
-						if err != nil {
-							// log.Printf("[V - %s] Failed to get parcel %d: %s\n", s.host.ID()[0:5].Pretty(), p.StartingIndex, err.Error())
-
-							parcelStatus := "fail"
-							if err.Error() == "context deadline exceeded" {
-								parcelStatus = "timeout"
-							}
-
-							stats.GetLatencies = append(stats.GetLatencies, getLatency)
-							stats.GetHops = append(stats.GetHops, 0)
-							stats.GetTimestamps = append(stats.GetTimestamps, getTimestamp)
-							stats.BlockIDs = append(stats.BlockIDs, fmt.Sprint(blockID))
-							stats.ParcelKeyHashes = append(stats.ParcelKeyHashes, keyHashString)
-							stats.ParcelStatuses = append(stats.ParcelStatuses, parcelStatus)
-							stats.ParcelDataLengths = append(stats.ParcelDataLengths, len(returnedPayload))
-
-							stats.TotalFailedGets += 1
-							stats.TotalGetMessages += 1
-
-							if err.Error() == "context deadline exceeded" {
-								break
-							}
-
-						} else {
-							stats.GetLatencies = append(stats.GetLatencies, getLatency)
-							stats.GetHops = append(stats.GetHops, 0)
-							stats.GetTimestamps = append(stats.GetTimestamps, getTimestamp)
-							stats.BlockIDs = append(stats.BlockIDs, fmt.Sprint(blockID))
-							stats.ParcelKeyHashes = append(stats.ParcelKeyHashes, keyHashString)
-							stats.ParcelStatuses = append(stats.ParcelStatuses, "success")
-							stats.ParcelDataLengths = append(stats.ParcelDataLengths, len(returnedPayload))
-
-							stats.TotalGetMessages += 1
-							stats.TotalSuccessGets += 1
-
-							sampledParcelIDs = append(sampledParcelIDs, p.StartingIndex)
-						}
-					}
-
-				}(parcel, blockID)
-			}
-			parcelWg.Wait()
-
-			stats.TotalSamplingLatencies = append(stats.TotalSamplingLatencies, time.Since(startTime))
-
-			log.Printf("[R - %s] Block %d sampling took %.2f seconds.\n", s.host.ID()[0:5].Pretty(), blockID, time.Since(startTime).Seconds())
-
-			// Wait until the block time is over
-			remainingTime := time.Until(startTime.Add(BLOCK_TIME_SEC * time.Second))
-			time.Sleep(remainingTime)
-
-		}
 
 	} else {
 		panic("Peer type not recognized: " + peerType)
