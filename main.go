@@ -15,15 +15,15 @@ import (
 	"sync"
 	"time"
 
-	dht "github.com/Blitz3r123/go-libp2p-kad-dht"
+   dht "github.com/libp2p/go-libp2p-kad-dht"
 	"github.com/libp2p/go-libp2p"
-	"github.com/libp2p/go-libp2p-core/crypto"
-	"github.com/libp2p/go-libp2p-core/host"
-	"github.com/libp2p/go-libp2p-core/network"
-	"github.com/libp2p/go-libp2p-core/peer"
-	"github.com/libp2p/go-libp2p-core/protocol"
-	discovery "github.com/libp2p/go-libp2p-discovery"
-	peerstore "github.com/libp2p/go-libp2p-peerstore"
+   "github.com/libp2p/go-libp2p/core/crypto"
+   "github.com/libp2p/go-libp2p/core/host"
+   "github.com/libp2p/go-libp2p/core/network"
+   "github.com/libp2p/go-libp2p/core/peer"
+   "github.com/libp2p/go-libp2p/core/protocol"
+	//discovery "github.com/libp2p/go-libp2p-discovery"
+	//peerstore "github.com/libp2p/go-libp2p/p2p/host/peerstore"
 	"github.com/multiformats/go-multiaddr"
 )
 
@@ -36,6 +36,7 @@ type Config struct {
 	Seed           int64
 	DiscoveryPeers addrList
 	Debug          bool
+   ExperimentDuration int
 }
 
 type Stats struct {
@@ -83,8 +84,10 @@ func main() {
 	flag.Var(&config.DiscoveryPeers, "peer", "Peer multiaddress for peer discovery")
 	flag.StringVar(&config.ProtocolID, "protocolid", "/p2p/rpc", "")
 	flag.IntVar(&config.Port, "port", 0, "")
+   flag.IntVar(&config.ExperimentDuration, "duration", 30, "Experiment duration (in seconds).")
 	flag.Parse()
 
+   const builder_id = "12D3KooWE3AwZFT9zEWDUxhya62hmvEbRxYBWaosn7Kiqw5wsu73"
 	nodeType := strings.ToLower(config.NodeType)
 	nodeTypeSuffix := ""
 
@@ -120,7 +123,6 @@ func main() {
 	addr, _ := multiaddr.NewMultiaddr(fmt.Sprintf("/ip4/127.0.0.1/tcp/%d", config.Port))
 
 	h, err := libp2p.New(
-		context.Background(),
 		libp2p.ListenAddrs(addr),
 		libp2p.Identity(priv),
 	)
@@ -133,9 +135,9 @@ func main() {
 		log.Fatal(err)
 	}
 
-	h.Peerstore().AddAddrs(dht.Host().ID(), dht.Host().Addrs(), peerstore.PermanentAddrTTL)
-	routingDiscovery := discovery.NewRoutingDiscovery(dht)
-	discovery.Advertise(context.Background(), routingDiscovery, "das")
+	//h.Peerstore().AddAddrs(dht.Host().ID(), dht.Host().Addrs(), peerstore.PermanentAddrTTL)
+	//routingDiscovery := discovery.NewRoutingDiscovery(dht)
+	//discovery.Advertise(context.Background(), routingDiscovery, "das")
 
 	// Register an event handler for peer connection
 	h.Network().Notify(&network.NotifyBundle{
@@ -158,13 +160,13 @@ func main() {
 				routingTablePeerCountAfter := len(dht.RoutingTable().ListPeers())
 
 				if routingTablePeerCountBefore == routingTablePeerCountAfter {
-					log.Printf("[%s - %s]: Failed to add peer %s to routing table\n", node_suffix, h.ID()[0:5].Pretty(), remote_peer_id[:5].Pretty())
+					log.Printf("[%s - %s]: Failed to add peer %s to routing table\n", node_suffix, h.ID()[0:5], remote_peer_id[:5])
 				} else {
 					log.Printf(
 						"[%s - %s]: Peer %s connected to builder (%d -> %d connections)\n",
 						node_suffix,
-						h.ID()[0:5].Pretty(),
-						remote_peer_id[:5].Pretty(),
+						h.ID()[0:5],
+						remote_peer_id[:5],
 						routingTablePeerCountBefore,
 						routingTablePeerCountAfter,
 					)
@@ -179,7 +181,7 @@ func main() {
 
 	if nodeType == "builder" {
 
-		log.Printf("[B - %s] Builder started: %s\n", h.ID().Pretty()[:5], h.ID().Pretty())
+		log.Printf("[B - %s] Builder started: %s\n", h.ID()[:5], h.ID())
 
 	} else {
 
@@ -187,7 +189,7 @@ func main() {
 		go waitForBuilder(&wg, config.DiscoveryPeers, h, dht)
 		wg.Wait()
 
-		log.Printf("[%s - %s] Peer started: %s\n", nodeTypeSuffix, h.ID().Pretty()[:5], h.ID().Pretty()[:5])
+		log.Printf("[%s - %s] Peer started: %s\n", nodeTypeSuffix, h.ID()[:5], h.ID()[:5])
 
 	}
 
@@ -197,24 +199,24 @@ func main() {
 		log.Fatal(err)
 	}
 
-	service.StartMessaging(h, dht, stats, nodeType, config.ParcelSize, ctx)
+	service.StartMessaging(h, dht, stats, nodeType, config.ParcelSize, ctx, config.ExperimentDuration)
 
 	if filename, err := writeOperationsToFile(stats, h, nodeType); err != nil {
 		log.Fatal(err)
 	} else {
-		log.Printf("[%s - %s] Operations written to %s\n", nodeTypeSuffix, h.ID()[0:5].Pretty(), filename)
+		log.Printf("[%s - %s] Operations written to %s\n", nodeTypeSuffix, h.ID()[0:5], filename)
 	}
 
 	if filename, err := writeTotalStatsToFile(stats, h, nodeType); err != nil {
 		log.Fatal(err)
 	} else {
-		log.Printf("[%s - %s] Total Stats written to %s\n", nodeTypeSuffix, h.ID()[0:5].Pretty(), filename)
+		log.Printf("[%s - %s] Total Stats written to %s\n", nodeTypeSuffix, h.ID()[0:5], filename)
 	}
 
 	if filename, err := writeLatencyStatsToFile(stats, h, nodeType); err != nil {
 		log.Fatal(err)
 	} else {
-		log.Printf("[%s - %s] Latencies written to %s\n", nodeTypeSuffix, h.ID()[0:5].Pretty(), filename)
+		log.Printf("[%s - %s] Latencies written to %s\n", nodeTypeSuffix, h.ID()[0:5], filename)
 	}
 
 	cancel()
@@ -222,7 +224,7 @@ func main() {
 }
 
 func writeTotalStatsToFile(stats *Stats, h host.Host, nodeType string) (string, error) {
-	filename := h.ID()[0:10].Pretty() + "_total_stats_" + nodeType + ".csv"
+	filename := h.ID().String()[0:10] + "_total_stats_" + nodeType + ".csv"
 
 	f, err := os.Create(filename)
 	if err != nil {
@@ -250,7 +252,7 @@ func writeTotalStatsToFile(stats *Stats, h host.Host, nodeType string) (string, 
 }
 
 func writeOperationsToFile(stats *Stats, h host.Host, nodeType string) (string, error) {
-	filename := h.ID()[0:10].Pretty() + "_operations_" + nodeType + ".csv"
+	filename := h.ID().String()[0:10] + "_operations_" + nodeType + ".csv"
 
 	// Convert latencies and hops to rows
 	var operationRows [][]string
@@ -338,7 +340,7 @@ func writeOperationsToFile(stats *Stats, h host.Host, nodeType string) (string, 
 }
 
 func writeLatencyStatsToFile(stats *Stats, h host.Host, nodeType string) (string, error) {
-	filename := h.ID()[0:10].Pretty() + "_latency_stats_" + nodeType + ".csv"
+	filename := h.ID().String()[0:10] + "_latency_stats_" + nodeType + ".csv"
 
 	// Convert latencies and hops to rows
 	var latencyRows [][]string
