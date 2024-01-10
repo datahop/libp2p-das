@@ -15,28 +15,30 @@ import (
 	"sync"
 	"time"
 
-   dht "github.com/libp2p/go-libp2p-kad-dht"
 	"github.com/libp2p/go-libp2p"
-   "github.com/libp2p/go-libp2p/core/crypto"
-   "github.com/libp2p/go-libp2p/core/host"
-   "github.com/libp2p/go-libp2p/core/network"
-   "github.com/libp2p/go-libp2p/core/peer"
-   "github.com/libp2p/go-libp2p/core/protocol"
+	dht "github.com/libp2p/go-libp2p-kad-dht"
+	"github.com/libp2p/go-libp2p/core/crypto"
+	"github.com/libp2p/go-libp2p/core/host"
+	"github.com/libp2p/go-libp2p/core/network"
+	"github.com/libp2p/go-libp2p/core/peer"
+	"github.com/libp2p/go-libp2p/core/protocol"
+
 	//discovery "github.com/libp2p/go-libp2p-discovery"
 	//peerstore "github.com/libp2p/go-libp2p/p2p/host/peerstore"
 	"github.com/multiformats/go-multiaddr"
 )
 
 type Config struct {
-	NodeType       string
-	ParcelSize     int
-	Port           int
-	ProtocolID     string
-	Rendezvous     string
-	Seed           int64
-	DiscoveryPeers addrList
-	Debug          bool
-   ExperimentDuration int
+	NodeType           string
+	IP                 string
+	ParcelSize         int
+	Port               int
+	ProtocolID         string
+	Rendezvous         string
+	Seed               int64
+	DiscoveryPeers     addrList
+	Debug              bool
+	ExperimentDuration int
 }
 
 type Stats struct {
@@ -84,10 +86,11 @@ func main() {
 	flag.Var(&config.DiscoveryPeers, "peer", "Peer multiaddress for peer discovery")
 	flag.StringVar(&config.ProtocolID, "protocolid", "/p2p/rpc", "")
 	flag.IntVar(&config.Port, "port", 0, "")
-   flag.IntVar(&config.ExperimentDuration, "duration", 30, "Experiment duration (in seconds).")
+	flag.IntVar(&config.ExperimentDuration, "duration", 30, "Experiment duration (in seconds).")
+	flag.StringVar(&config.IP, "ip", "127.0.0.1", "IP address of this machine.")
 	flag.Parse()
 
-   const builder_id = "12D3KooWE3AwZFT9zEWDUxhya62hmvEbRxYBWaosn7Kiqw5wsu73"
+	const builder_id = "12D3KooWE3AwZFT9zEWDUxhya62hmvEbRxYBWaosn7Kiqw5wsu73"
 	nodeType := strings.ToLower(config.NodeType)
 	nodeTypeSuffix := ""
 
@@ -120,7 +123,7 @@ func main() {
 		log.Fatal(err)
 	}
 
-	addr, _ := multiaddr.NewMultiaddr(fmt.Sprintf("/ip4/127.0.0.1/tcp/%d", config.Port))
+	addr, _ := multiaddr.NewMultiaddr(fmt.Sprintf("/ip4/%s/tcp/%d", config.IP, config.Port))
 
 	h, err := libp2p.New(
 		libp2p.ListenAddrs(addr),
