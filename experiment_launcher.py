@@ -121,7 +121,6 @@ def main(output_dir):
     )
 
     #Validate Grid5000 configuration
-    start = datetime.datetime.now() #Timestamp grid5000 job start
     provider = en.G5k(conf)
     roles, networks = provider.init()
     roles = en.sync_info(roles, networks)
