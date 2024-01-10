@@ -143,18 +143,18 @@ def main(output_dir):
     i = 0
 
     results = en.run_command("ip -o -4 addr show scope global | awk '!/^[0-9]+: lo:/ {print $4}' | cut -d '/' -f 1", roles=roles["experiment"][0])
-    ip = results[0].payload["stdout"]
+    builder_ip = results[0].payload["stdout"]
 
     for x in roles["experiment"]:
         with en.actions(roles=x, on_error_continue=True, background=True) as p:
-            if x == roles["experiment"][0]:
-                builder, validator, regular = partition[i]
-                p.shell(f"/home/{login}/run.sh {experiment_name} {builder} {validator} {regular} {login} 127.0.0.1 {parcel_size}")
-                i += 1
-            else:
-                builder, validator, regular = partition[i]
-                p.shell(f"/home/{login}/run.sh {experiment_name} {builder} {validator} {regular} {login} {ip} {parcel_size}")
-                i += 1
+            # if x == roles["experiment"][0]:
+            #     builder, validator, regular = partition[i]
+            #     p.shell(f"/home/{login}/run.sh {experiment_name} {builder} {validator} {regular} {login} 127.0.0.1 {parcel_size}")
+            #     i += 1
+            # else:
+            builder, validator, regular = partition[i]
+            p.shell(f"/home/{login}/run.sh {experiment_name} {builder} {validator} {regular} {login} {builder_ip} {parcel_size}")
+            i += 1
     
     start = datetime.datetime.now() #Timestamp grid5000 job start
     start_formatted = start.strftime("%H:%M:%S")
