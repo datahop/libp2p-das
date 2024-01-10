@@ -68,8 +68,8 @@ def main(output_dir):
     #========== Parameters ==========
     #Grid5000 parameters
     USERNAME = "kpeeroo" #Grid5000 login
-    site = "nancy" #Grid5000 Site See: https://www.grid5000.fr/w/Status and https://www.grid5000.fr/w/Hardware
-    cluster = "gros" #Gride5000 Cluster name See: https://www.grid5000.fr/w/Status and https://www.grid5000.fr/w/Hardware
+    site = "lyon" #Grid5000 Site See: https://www.grid5000.fr/w/Status and https://www.grid5000.fr/w/Hardware
+    cluster = "taurus" #Gride5000 Cluster name See: https://www.grid5000.fr/w/Status and https://www.grid5000.fr/w/Hardware
     job_name = "PANDAS_libp2p"
 
     #Node launch script path
@@ -170,8 +170,8 @@ def main(output_dir):
     console.print("Start: ", start_formatted, style="bold green")
     console.print("Expected End: ", add_time(start, seconds=WALLTIME_SECS).strftime("%H:%M:%S"), style="bold green")
 
-    for i in track(range(WALLTIME_SECS), description=f"Waiting for walltime ({WALLTIME_SECS} secs)..."):
-        time.sleep(1)
+    # for i in track(range(WALLTIME_SECS), description=f"Waiting for walltime ({WALLTIME_SECS} secs)..."):
+    #     time.sleep(1)
 
     """
     if output_dir != None:
@@ -211,7 +211,7 @@ def main(output_dir):
     
     #Release all Grid'5000 resources
     # netem.destroy()
-    provider.destroy()
+    # provider.destroy()
 
 if __name__ == "__main__":
     # Check if argument is sent in and is a valid dir path
