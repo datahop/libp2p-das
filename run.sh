@@ -9,6 +9,15 @@ builder_ip=$6
 parcel_size=$7
 exp_duration=$8
 
+echo "Experiment name: $experiment_name"
+echo "Builder count: $builder_count"
+echo "Validator count: $validator_count"
+echo "Non validator count: $non_validator_count"
+echo "Login: $login"
+echo "Builder IP: $builder_ip"
+echo "Parcel size: $parcel_size"
+echo "Experiment duration: $exp_duration"
+
 result_dir="/home/${login}/results"
 finish_time=$(date +%d-%m-%y-%H-%M)
 result_dir="${result_dir}/${experiment_name}_${finish_time}"
