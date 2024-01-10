@@ -102,27 +102,7 @@ func StartSeedingBlock(blockID int, blockDimension int, parcelSize int, s *Servi
    elapsedTime := time.Since(startTime)
    stats.SeedingLatencies = append(stats.SeedingLatencies, elapsedTime)
 
-   log.Printf("[B - %s] Finished seeding block %d in %s (%d/%d)\n", s.host.ID()[0:5], blockID, elapsedTime, stats.TotalSuccessPuts, stats.TotalPutMessages)
-   // Send block start signal
-   putErr := dht.PutValue(
-      ctx,
-      "/das/block/"+fmt.Sprint(blockID),
-      make([]byte, 1),
-   )
-   putTimestamp := time.Now()
-
-   if putErr != nil {
-      log.Printf("[B - %s] Failed to put block start signal: %s\n", s.host.ID()[0:5], putErr.Error())
-   } else {
-      log.Printf("[B - %s] Starting to seed block %d...\n", s.host.ID()[0:5], blockID)
-
-      // Record the starting signal as a parcel with id -1
-      stats.PutLatencies = append(stats.PutLatencies, time.Since(time.Now()))
-      stats.PutTimestamps = append(stats.PutTimestamps, putTimestamp)
-      stats.BlockIDs = append(stats.BlockIDs, fmt.Sprint(blockID))
-      stats.ParcelKeyHashes = append(stats.ParcelKeyHashes, "-1")
-      stats.ParcelStatuses = append(stats.ParcelStatuses, "success")
-   }
+   //log.Printf("[B - %s] Finished seeding block %d in %s (%d/%d)\n", s.host.ID()[0:5], blockID, elapsedTime, stats.TotalSuccessPuts, stats.TotalPutMessages)
 
    log.Printf("[B - %s] Finished seeding %d parcels.\n", s.host.ID()[0:5], len(allParcels))
 
