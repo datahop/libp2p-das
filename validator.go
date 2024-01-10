@@ -66,13 +66,9 @@ func StartValidatorSampling(blockID int, blockDimension int, parcelSize int, s *
             parcelType = "row"
          }
 
+         startTime := time.Now()
          for !contains(sampledParcelIDs, p.StartingIndex) {
-            //remainingTime := time.Until(startTime.Add(BLOCK_TIME_SEC * time.Second))
 
-            //ctx, cancel := context.WithTimeout(ctx, remainingTime)
-            //defer cancel()
-
-            startTime := time.Now()
             returnedPayload, err := dht.GetValue(
                ctx,
                "/das/sample/"+fmt.Sprint(blockID)+"/"+parcelType+"/"+fmt.Sprint(p.StartingIndex),
@@ -101,10 +97,8 @@ func StartValidatorSampling(blockID int, blockDimension int, parcelSize int, s *
 
                stats.TotalFailedGets += 1
                stats.TotalGetMessages += 1
+               time.Sleep(1000 * time.Millisecond)
 
-               if err.Error() == "context deadline exceeded" {
-                  break
-               }
             } else {
                stats.GetLatencies = append(stats.GetLatencies, getLatency)
                stats.GetHops = append(stats.GetHops, 0)
@@ -118,7 +112,6 @@ func StartValidatorSampling(blockID int, blockDimension int, parcelSize int, s *
                stats.TotalSuccessGets += 1
 
                sampledParcelIDs = append(sampledParcelIDs, p.StartingIndex)
-
             }
          }
 

@@ -251,8 +251,8 @@ func (s *Service) StartMessaging(h host.Host, dht *dht.IpfsDHT, stats *Stats, pe
             return
 
          case <-blockTicker.C:
-            pub.HeaderPublish(blockID)
             blockID += 1
+            pub.HeaderPublish(blockID)
             go StartSeedingBlock(blockID, ROW_COUNT, parcelSize, s, ctx, stats, dht)
             //TODO add a mutex to make currBlock thread-safe
          default:
