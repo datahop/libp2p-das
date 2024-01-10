@@ -24,7 +24,7 @@ fi
 echo "Installing go"
 cd /tmp
 wget "https://go.dev/dl/go1.20.4.linux-amd64.tar.gz"
-sudo-g5k tar -C /usr/local -xzf go1.20.4.linux-amd64.tar.gz
+tar -C /usr/local -xzf go1.20.4.linux-amd64.tar.gz
 export PATH=$PATH:/usr/local/go/bin
 
 echo "Installing libp2p-das-datahop"
@@ -32,28 +32,30 @@ echo "Installing libp2p-das-datahop"
 git clone https://github.com/Blitz3r123/libp2p-das-datahop.git
 cd libp2p-das-datahop
 
-sudo-g5k systemctl start sysstat
+systemctl start sysstat
 sar -A -o sar_logs 1 $exp_duration >/dev/null 2>&1 &
 sleep 1
 
 ip=$(hostname -I | awk '{print $1}')
 echo "IP: $ip"
 
+echo "Number of files: $(ls -l | grep -v ^d | wc -l)"
+
 # Run builders
 for ((i=0; i<$builder_count-1; i++))
 do
     echo "[BACKGROUND] Running builder $i"
-    go run . -seed 1234 -port 61960 -nodeType builder -parcelSize $parcel_size -duration $exp_duration -ip $ip &
+    go run . -seed 1234 -port 61960 -nodeType builder -parcelSize $parcel_size -duration $exp_duration -ip $ip >> builder_output.txt 2>&1 &
     sleep 1
 done
 if [ $(($builder_count)) -ne 0 ]; then
     if [ $(($non_validator_count)) -eq 0 ] && [ $(($validator_count)) -eq 0 ]; then
         echo "[FOREGROUND] Running builder [0]"
 
-        go run . -seed 1234 -port 61960 -nodeType builder -parcelSize $parcel_size -duration $exp_duration -ip $ip
+        go run . -seed 1234 -port 61960 -nodeType builder -parcelSize $parcel_size -duration $exp_duration -ip $ip >> builder_output.txt 2>&1
         sleep 1
     else
-        go run . -seed 1234 -port 61960 -nodeType builder -parcelSize $parcel_size -duration $exp_duration -ip $ip &
+        go run . -seed 1234 -port 61960 -nodeType builder -parcelSize $parcel_size -duration $exp_duration -ip $ip >> builder_output.txt 2>&1 &
         sleep 1
     fi;
 fi;
@@ -62,34 +64,47 @@ fi;
 for ((i=0; i<$validator_count - 1; i++))
 do
     echo "[BACKGROUND] Running validator $i"
-    go run . -nodeType validator -parcelSize $parcel_size -duration $exp_duration -ip $ip -peer /ip4/$builder_ip/tcp/61960/p2p/12D3KooWE3AwZFT9zEWDUxhya62hmvEbRxYBWaosn7Kiqw5wsu73 &
+    go run . -nodeType validator -parcelSize $parcel_size -duration $exp_duration -ip $ip -peer /ip4/$builder_ip/tcp/61960/p2p/12D3KooWE3AwZFT9zEWDUxhya62hmvEbRxYBWaosn7Kiqw5wsu73 >> validator_$i_output.txt 2>&1 &
 done
 
 if [ $(($non_validator_count)) -eq 0 ]
 then
     if [ $(($validator_count)) -ne 0 ]; then
         echo "[FOREGROUND] Running validator $i"
-        go run . -nodeType validator -parcelSize $parcel_size -duration $exp_duration -ip $ip -peer /ip4/$builder_ip/tcp/61960/p2p/12D3KooWE3AwZFT9zEWDUxhya62hmvEbRxYBWaosn7Kiqw5wsu73
+        go run . -nodeType validator -parcelSize $parcel_size -duration $exp_duration -ip $ip -peer /ip4/$builder_ip/tcp/61960/p2p/12D3KooWE3AwZFT9zEWDUxhya62hmvEbRxYBWaosn7Kiqw5wsu73 >> validator_$i_output.txt 2>&1
         sleep 1
     fi;
 else
     echo "[BACKGROUND] Running validator $i"
-    go run . -nodeType validator -parcelSize $parcel_size -duration $exp_duration -ip $ip -peer /ip4/$builder_ip/tcp/61960/p2p/12D3KooWE3AwZFT9zEWDUxhya62hmvEbRxYBWaosn7Kiqw5wsu73 &
+    go run . -nodeType validator -parcelSize $parcel_size -duration $exp_duration -ip $ip -peer /ip4/$builder_ip/tcp/61960/p2p/12D3KooWE3AwZFT9zEWDUxhya62hmvEbRxYBWaosn7Kiqw5wsu73 >> validator_$i_output.txt 2>&1 &
 fi
 
 # Run non validators
 for ((i=0; i<$non_validator_count - 1; i++))
 do
     echo "[BACKGROUND] Running non validator $i"
-    go run . -nodeType nonvalidator -parcelSize $parcel_size -duration $exp_duration -ip $ip -peer /ip4/$builder_ip/tcp/61960/p2p/12D3KooWE3AwZFT9zEWDUxhya62hmvEbRxYBWaosn7Kiqw5wsu73 &
+    go run . -nodeType nonvalidator -parcelSize $parcel_size -duration $exp_duration -ip $ip -peer /ip4/$builder_ip/tcp/61960/p2p/12D3KooWE3AwZFT9zEWDUxhya62hmvEbRxYBWaosn7Kiqw5wsu73 >> non_validator_$i_output.txt 2>&1 &
 done
 
 if [ $(($non_validator_count)) -ne 0 ]; then
     echo "[FOREGROUND] Running non validator $i"
-    go run . -nodeType nonvalidator -parcelSize $parcel_size -duration $exp_duration -ip $ip -peer /ip4/$builder_ip/tcp/61960/p2p/12D3KooWE3AwZFT9zEWDUxhya62hmvEbRxYBWaosn7Kiqw5wsu73
+    go run . -nodeType nonvalidator -parcelSize $parcel_size -duration $exp_duration -ip $ip -peer /ip4/$builder_ip/tcp/61960/p2p/12D3KooWE3AwZFT9zEWDUxhya62hmvEbRxYBWaosn7Kiqw5wsu73 >> non_validator_$i_output.txt 2>&1
     sleep 1
 fi;
 
+echo "End of go commands"
+sleep 1
+
+echo "Number of files: $(ls -l | grep -v ^d | wc -l)"
+echo "Number of csv files: $(ls -l *.csv | grep -v ^d | wc -l)"
+
 cp *.csv "$result_dir"
-cp sar_logs "$result_dir"
+
+if [ -f "sar_logs" ]; then
+    echo "Copying sar_logs file"
+    cp sar_logs "$result_dir"
+else
+    echo "sar_logs file does not exist"
+fi
+
 sleep 1
