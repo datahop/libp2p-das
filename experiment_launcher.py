@@ -67,9 +67,9 @@ def node_partition(nb_cluster_machine, nb_builder, nb_validator, nb_regular):
 def main(output_dir):
     #========== Parameters ==========
     #Grid5000 parameters
-    login = "kpeeroo" #Grid5000 login
-    site = "nancy" #Grid5000 Site See: https://www.grid5000.fr/w/Status and https://www.grid5000.fr/w/Hardware
-    cluster = "gros" #Gride5000 Cluster name See: https://www.grid5000.fr/w/Status and https://www.grid5000.fr/w/Hardware
+    USERNAME = "kpeeroo" #Grid5000 login
+    site = "lyon" #Grid5000 Site See: https://www.grid5000.fr/w/Status and https://www.grid5000.fr/w/Hardware
+    cluster = "taurus" #Gride5000 Cluster name See: https://www.grid5000.fr/w/Status and https://www.grid5000.fr/w/Hardware
     job_name = "PANDAS_libp2p"
 
     #Node launch script path
@@ -77,16 +77,24 @@ def main(output_dir):
     launch_script = dir_path +"/" + "run.sh"
 
     #Experiment parameters
-    parcel_size = 512
-    nb_cluster_machine = 3         #Number of machine booked on the cluster
-    nb_experiment_node = 3        #Number of nodes running for the experiment
+    PARCEL_SIZE = 512
+
+    #Number of machine booked on the cluster
+    nb_cluster_machine = 3        
+    #Number of nodes running for the experiment 
+    nb_experiment_node = 3        
+
     nb_builder = 1
     nb_validator = 1
     nb_regular = nb_experiment_node - nb_builder - nb_validator
-    experiment_name = f"PANDAS_libp2p_{nb_builder}b_{nb_validator}v_{nb_regular}r_{parcel_size}p_"
+
     current_datetime = datetime.datetime.now()
-    experiment_name += current_datetime.strftime("%Y-%m-%d-%H:%M:%S")
-    walltime_secs = 300 #Experiment walltime in seconds
+    current_datetime_string = current_datetime.strftime("%Y-%m-%d-%H:%M:%S")
+
+    experiment_name = f"PANDAS_libp2p_{nb_builder}b_{nb_validator}v_{nb_regular}r_{PARCEL_SIZE}p_{current_datetime_string}"
+
+    EXPERIMENT_DURATION_SECS = 60
+    WALLTIME_SECS = EXPERIMENT_DURATION_SECS + 60                                                   # 60 seconds buffer
     
     #Network parameters 
     delay = "10%"
@@ -101,10 +109,10 @@ def main(output_dir):
     #Log to Grid5000 and check connection
     en.init_logging(level=logging.INFO)
     en.check()
-    network = en.G5kNetworkConf(type="prod", roles=["experiment_network"], site=site)
+    # network = en.G5kNetworkConf(type="prod", roles=["experiment_network"], site=site)
+    network = en.G5kNetworkConf(type="kavlan", roles=["experiment_network"], site=site)
     
-    job_walltime = seconds_to_hh_mm_ss(walltime_secs)
-
+    job_walltime = seconds_to_hh_mm_ss(WALLTIME_SECS)
     conf = (
         en.G5kConf.from_settings(job_name=job_name, walltime=job_walltime)
         .add_network_conf(network)
@@ -113,7 +121,6 @@ def main(output_dir):
     )
 
     #Validate Grid5000 configuration
-    start = datetime.datetime.now() #Timestamp grid5000 job start
     provider = en.G5k(conf)
     roles, networks = provider.init()
     roles = en.sync_info(roles, networks)
@@ -138,32 +145,32 @@ def main(output_dir):
 
     #========== Deploy Experiment ==========
     #Send launch script to Grid5000 site frontend
-    ssh_command = f'scp {launch_script} {login}@access.grid5000.fr:{site}'
-    execute_ssh_command(ssh_command, login, site)
+    ssh_command = f'scp {launch_script} {USERNAME}@access.grid5000.fr:{site}'
+    execute_ssh_command(ssh_command, USERNAME, site)
     i = 0
 
     results = en.run_command("ip -o -4 addr show scope global | awk '!/^[0-9]+: lo:/ {print $4}' | cut -d '/' -f 1", roles=roles["experiment"][0])
-    ip = results[0].payload["stdout"]
+    builder_ip = results[0].payload["stdout"]
 
     for x in roles["experiment"]:
         with en.actions(roles=x, on_error_continue=True, background=True) as p:
-            if x == roles["experiment"][0]:
-                builder, validator, regular = partition[i]
-                p.shell(f"/home/{login}/run.sh {experiment_name} {builder} {validator} {regular} {login} 127.0.0.1 {parcel_size}")
-                i += 1
-            else:
-                builder, validator, regular = partition[i]
-                p.shell(f"/home/{login}/run.sh {experiment_name} {builder} {validator} {regular} {login} {ip} {parcel_size}")
-                i += 1
+            # if x == roles["experiment"][0]:
+            #     builder, validator, regular = partition[i]
+            #     p.shell(f"/home/{USERNAME}/run.sh {experiment_name} {builder} {validator} {regular} {USERNAME} 127.0.0.1 {PARCEL_SIZE}")
+            #     i += 1
+            # else:
+            builder, validator, regular = partition[i]
+            p.shell(f"/home/{USERNAME}/run.sh {experiment_name} {builder} {validator} {regular} {USERNAME} {builder_ip} {PARCEL_SIZE} {EXPERIMENT_DURATION_SECS} >> run_sh_output_{current_datetime_string}_{i}.txt 2>&1")
+            i += 1
     
     start = datetime.datetime.now() #Timestamp grid5000 job start
     start_formatted = start.strftime("%H:%M:%S")
     
     console.print("Start: ", start_formatted, style="bold green")
-    console.print("Expected End: ", add_time(start, seconds=walltime_secs).strftime("%H:%M:%S"), style="bold green")
+    console.print("Expected End: ", add_time(start, seconds=WALLTIME_SECS).strftime("%H:%M:%S"), style="bold green")
 
-    for i in track(range(walltime_secs + 30), description="Waiting for walltime..."):
-        time.sleep(1)
+    # for i in track(range(WALLTIME_SECS), description=f"Waiting for walltime ({WALLTIME_SECS} secs)..."):
+    #     time.sleep(1)
 
     """
     if output_dir != None:
@@ -203,7 +210,7 @@ def main(output_dir):
     
     #Release all Grid'5000 resources
     # netem.destroy()
-    provider.destroy()
+    # provider.destroy()
 
 if __name__ == "__main__":
     # Check if argument is sent in and is a valid dir path

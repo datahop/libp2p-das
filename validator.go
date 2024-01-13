@@ -1,123 +1,125 @@
 package main
 
 import (
-   "context"
+	"context"
 	"crypto/sha256"
-   "fmt"
-   "log"
-   "math/rand"
-   "sync"
-   "time"
+	"fmt"
+	"log"
+	"math/rand"
+	"sync"
+	"time"
 
-   dht "github.com/libp2p/go-libp2p-kad-dht"
+	dht "github.com/libp2p/go-libp2p-kad-dht"
 )
 
-func StartValidatorSampling(blockID int, blockDimension int, parcelSize int, s *Service, ctx context.Context, stats *Stats, dht *dht.IpfsDHT){
+func StartValidatorSampling(blockID int, blockDimension int, parcelSize int, s *Service, ctx context.Context, stats *Stats, dht *dht.IpfsDHT) {
 
-   startTime := time.Now()
+	startTime := time.Now()
 
-   samplesPerRow := blockDimension
-   rowColParcelsNeededCount := samplesPerRow / parcelSize
+	samplesPerRow := blockDimension
+	rowColParcelsNeededCount := samplesPerRow / parcelSize
 
-   if samplesPerRow%parcelSize != 0 {
-      rowColParcelsNeededCount++
-   }
+	if samplesPerRow%parcelSize != 0 {
+		rowColParcelsNeededCount++
+	}
 
-   randomParcelsNeededCount := 75
+	// randomParcelsNeededCount := 75
 
-   allParcels := SplitSamplesIntoParcels(blockDimension, parcelSize, "all")
-   rowParcels := SplitSamplesIntoParcels(blockDimension, parcelSize, "row")
-   colParcels := SplitSamplesIntoParcels(blockDimension, parcelSize, "col")
+	// allParcels := SplitSamplesIntoParcels(blockDimension, parcelSize, "all")
+	rowParcels := SplitSamplesIntoParcels(blockDimension, parcelSize, "row")
+	colParcels := SplitSamplesIntoParcels(blockDimension, parcelSize, "col")
 
-   randomRowParcels := pickRandomParcels(rowParcels, rowColParcelsNeededCount)
-   randomColParcels := pickRandomParcels(colParcels, rowColParcelsNeededCount)
-   randomParcels := pickRandomParcels(allParcels, randomParcelsNeededCount)
+	randomRowParcels := pickRandomParcels(rowParcels, rowColParcelsNeededCount)
+	randomColParcels := pickRandomParcels(colParcels, rowColParcelsNeededCount)
+	// randomParcels := pickRandomParcels(allParcels, randomParcelsNeededCount)
 
-   allRandomParcels := append(randomRowParcels, randomColParcels...)
-   allRandomParcels = append(allRandomParcels, randomParcels...)
+	allRandomParcels := append(randomRowParcels, randomColParcels...)
+	// allRandomParcels = append(allRandomParcels, randomParcels...)
 
-   // Randomize allRandomParcels
-   rand.Shuffle(len(allRandomParcels), func(i, j int) {
-      allRandomParcels[i], allRandomParcels[j] = allRandomParcels[j], allRandomParcels[i]
-   })
+	// Randomize allRandomParcels
+	rand.Shuffle(len(allRandomParcels), func(i, j int) {
+		allRandomParcels[i], allRandomParcels[j] = allRandomParcels[j], allRandomParcels[i]
+	})
 
-   log.Printf(
-      "[V - %s] Sampling %d parcels (%d/%d Rows, %d/%d Cols, %d/%d All) for Block %d...\n",
-      s.host.ID().String()[0:5],
-      len(allRandomParcels),
-      len(randomRowParcels),
-      rowColParcelsNeededCount,
-      len(randomColParcels),
-      rowColParcelsNeededCount,
-      len(randomParcels),
-      randomParcelsNeededCount,
-      blockID,
-   )
+	log.Printf(
+		"[V - %s] Sampling %d parcels (%d/%d Rows, %d/%d Cols) for Block %d...\n",
+		s.host.ID().String()[0:5],
 
-   sampledParcelIDs := make([]int, 0)
-   var parcelWg sync.WaitGroup
-   for _, parcel := range allRandomParcels {
-      parcelWg.Add(1)
-      go func(p Parcel) {
-         defer parcelWg.Done()
+		len(allRandomParcels),
 
-         parcelType := "col"
-         if p.IsRow {
-            parcelType = "row"
-         }
+		len(randomRowParcels),
+		rowColParcelsNeededCount,
 
-         startTime := time.Now()
-         for !contains(sampledParcelIDs, p.StartingIndex) {
+		len(randomColParcels),
+		rowColParcelsNeededCount,
 
-            returnedPayload, err := dht.GetValue(
-               ctx,
-               "/das/sample/"+fmt.Sprint(blockID)+"/"+parcelType+"/"+fmt.Sprint(p.StartingIndex),
-            )
-            getLatency := time.Since(startTime)
-            getTimestamp := time.Now()
+		blockID,
+	)
 
-            keyHash := sha256.Sum256([]byte("/das/sample/" + fmt.Sprint(blockID) + "/" + parcelType + "/" + fmt.Sprint(p.StartingIndex)))
-            keyHashString := fmt.Sprintf("%x", keyHash)
+	sampledParcelIDs := make([]int, 0)
+	var parcelWg sync.WaitGroup
+	for _, parcel := range allRandomParcels {
+		parcelWg.Add(1)
+		go func(p Parcel) {
+			defer parcelWg.Done()
 
-            if err != nil {
-               // log.Printf("[V - %s] Failed to get parcel %d: %s\n", s.host.ID()[0:5].Pretty(), p.StartingIndex, err.Error())
+			parcelType := "col"
+			if p.IsRow {
+				parcelType = "row"
+			}
 
-               parcelStatus := "fail"
-               if err.Error() == "context deadline exceeded" {
-                  parcelStatus = "timeout"
-               }
+			startTime := time.Now()
+			for !contains(sampledParcelIDs, p.StartingIndex) {
 
-               stats.GetLatencies = append(stats.GetLatencies, getLatency)
-               stats.GetHops = append(stats.GetHops, 0)
-               stats.GetTimestamps = append(stats.GetTimestamps, getTimestamp)
-               stats.BlockIDs = append(stats.BlockIDs, fmt.Sprint(blockID))
-               stats.ParcelKeyHashes = append(stats.ParcelKeyHashes, keyHashString)
-               stats.ParcelStatuses = append(stats.ParcelStatuses, parcelStatus)
-               stats.ParcelDataLengths = append(stats.ParcelDataLengths, len(returnedPayload))
+				returnedPayload, err := dht.GetValue(
+					ctx,
+					"/das/sample/"+fmt.Sprint(blockID)+"/"+parcelType+"/"+fmt.Sprint(p.StartingIndex),
+				)
+				getLatency := time.Since(startTime)
+				getTimestamp := time.Now()
 
-               stats.TotalFailedGets += 1
-               stats.TotalGetMessages += 1
-               time.Sleep(1000 * time.Millisecond)
+				keyHash := sha256.Sum256([]byte("/das/sample/" + fmt.Sprint(blockID) + "/" + parcelType + "/" + fmt.Sprint(p.StartingIndex)))
+				keyHashString := fmt.Sprintf("%x", keyHash)
 
-            } else {
-               stats.GetLatencies = append(stats.GetLatencies, getLatency)
-               stats.GetHops = append(stats.GetHops, 0)
-               stats.GetTimestamps = append(stats.GetTimestamps, getTimestamp)
-               stats.BlockIDs = append(stats.BlockIDs, fmt.Sprint(blockID))
-               stats.ParcelKeyHashes = append(stats.ParcelKeyHashes, keyHashString)
-               stats.ParcelStatuses = append(stats.ParcelStatuses, "success")
-               stats.ParcelDataLengths = append(stats.ParcelDataLengths, len(returnedPayload))
+				if err != nil {
+					// log.Printf("[V - %s] Failed to get parcel %d: %s\n", s.host.ID()[0:5].Pretty(), p.StartingIndex, err.Error())
 
-               stats.TotalGetMessages += 1
-               stats.TotalSuccessGets += 1
+					parcelStatus := "fail"
+					if err.Error() == "context deadline exceeded" {
+						parcelStatus = "timeout"
+					}
 
-               sampledParcelIDs = append(sampledParcelIDs, p.StartingIndex)
-            }
-         }
+					stats.GetLatencies = append(stats.GetLatencies, getLatency)
+					stats.GetHops = append(stats.GetHops, 0)
+					stats.GetTimestamps = append(stats.GetTimestamps, getTimestamp)
+					stats.BlockIDs = append(stats.BlockIDs, fmt.Sprint(blockID))
+					stats.ParcelKeyHashes = append(stats.ParcelKeyHashes, keyHashString)
+					stats.ParcelStatuses = append(stats.ParcelStatuses, parcelStatus)
+					stats.ParcelDataLengths = append(stats.ParcelDataLengths, len(returnedPayload))
 
-      }(parcel)
-   }
-   parcelWg.Wait()
-   stats.TotalSamplingLatencies = append(stats.TotalSamplingLatencies, time.Since(startTime))
-   log.Printf("[V - %s] Block %d sampling took %.2f seconds.\n", s.host.ID().String()[0:5], blockID, time.Since(startTime).Seconds())
+					stats.TotalFailedGets += 1
+					stats.TotalGetMessages += 1
+					time.Sleep(1000 * time.Millisecond)
+
+				} else {
+					stats.GetLatencies = append(stats.GetLatencies, getLatency)
+					stats.GetHops = append(stats.GetHops, 0)
+					stats.GetTimestamps = append(stats.GetTimestamps, getTimestamp)
+					stats.BlockIDs = append(stats.BlockIDs, fmt.Sprint(blockID))
+					stats.ParcelKeyHashes = append(stats.ParcelKeyHashes, keyHashString)
+					stats.ParcelStatuses = append(stats.ParcelStatuses, "success")
+					stats.ParcelDataLengths = append(stats.ParcelDataLengths, len(returnedPayload))
+
+					stats.TotalGetMessages += 1
+					stats.TotalSuccessGets += 1
+
+					sampledParcelIDs = append(sampledParcelIDs, p.StartingIndex)
+				}
+			}
+
+		}(parcel)
+	}
+	parcelWg.Wait()
+	stats.TotalSamplingLatencies = append(stats.TotalSamplingLatencies, time.Since(startTime))
+	log.Printf("[V - %s] Block %d sampling took %.2f seconds.\n", s.host.ID().String()[0:5], blockID, time.Since(startTime).Seconds())
 }
